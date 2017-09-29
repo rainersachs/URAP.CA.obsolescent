@@ -230,3 +230,25 @@ CI_function_MIXDER_MC_2 = function(d, d_interested, r, interval = 0.95, L, Z.bet
   CI = c(lower_bound, upper_bound)
   return(CI)
 }
+out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = c(seq(0, 0.01, 0.001), seq(0.01, 0.5, by = 0.01)))
+two_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+d = two_ion_MIXDER$d
+#Then the 95% CI multivariate MC simulated ribbon
+ninty_five_CI_lower = vector(length = 0)
+ninty_five_CI_upper = vector(length = 0)
+a = vector(length = 0)
+for (i in 2:length(d)) {
+  a = CI_function_MIXDER(d = c(0, two_ion_MIXDER$d[i]), d_interested = two_ion_MIXDER$d[i], r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
+  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+}
+two_ion_MIXDER$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
+two_ion_MIXDER$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
+
+#Get the simple effect additivity MIXDER
+two_ion_MIXDER$simpleeffect = IDER(d = 0.5*d, L = 100, Z.b = 690) + IDER(d = 0.5*d, L = 175, Z.b = 1075) + 0.00071
+#Get the individual IDERS
+two_ion_MIXDER$silicon = IDER(d = d, L = 100, Z.b = 690) + 0.00071
+two_ion_MIXDER$ironsix = IDER(d = d, L = 175, Z.b = 1075) + 0.00071
+save(two_ion_MIXDER, file = "two_ion_95%.Rda")
+
