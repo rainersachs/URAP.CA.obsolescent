@@ -16,7 +16,7 @@ m1 = 1
 m2 = 0.1
 E = 1
 xmax = 100
-Y0 = 0.001
+Y0 = 0.0001
 dose = seq(0, 100, 0.1)
 CA1 = seq(0, E, m1/10)
 CA2 = seq(E + m2/10, (m1-m2)*E/m1 + 100*m2, m2/10)
@@ -52,11 +52,10 @@ plot(dose, CA_IDER, main = "Dose-Effect Relationship (IDER)", xlab = "dose /cGy"
 ```{r, echo = TRUE}
 # Put in Weibull noise and see the new data frames
 noise_fac = 1/50
-noise_NTE1 = abs(rnorm(1001, sd = dose^(1/2)))
-noise_NTE2 = abs(rnorm(1001, sd = dose^(1/2)))
+noise_NTE = abs(rnorm(1001, sd = dose^(1/2)))
 noise_IDER = abs(rnorm(1001, sd = dose^(1/2)))
-CA_NTE1_w = CA_NTE1 * (1 + noise_fac * noise_NTE1)
-CA_NTE2_w = CA_NTE2 * (1 + noise_fac * noise_NTE2)
+CA_NTE1_w = CA_NTE1 * (1 + noise_fac * noise_NTE)
+CA_NTE2_w = CA_NTE2 * (1 + noise_fac * noise_NTE)
 CA_IDER_w = CA_IDER * (1 + noise_fac * noise_IDER)
 plot(dose, rep(0, 1001), main = "Dose-Effect Relationship", xlab = "dose /cGy", ylab = "CA /%", col = "#FFFFFF", xlim = c(0, xmax), ylim = c(0, xmax*m2))
 lines(dose, CA_NTE1_w, col = "red")
@@ -75,12 +74,12 @@ legend(80, 3, c('NTE1', 'NTE2', 'IDER'), lty = c(1,1), lwd = c(2, 2), col = c('r
 # Construct modified data frame to consider circumstances only when d > d0
 mod_df <- df[-seq(1, 10*E/m1 + 1, 1), ]
 # nls method to get the parameters needed (m1, m2, E, alpha; Y0 fixed) for NTE2 model
-NTE2_model = nlsLM(art_data ~ Y0 + f_NTE2(dose, m1, m2, E), data = mod_df, start = list(m1 = 1, m2 = 0.1, E = 1), weights = noise_NTE2[(10*E/m1 + 2):1001])
+NTE2_model = nlsLM(art_data ~ Y0 + f_NTE2(dose, m1, m2, E), data = mod_df, start = list(m1 = 1, m2 = 0.1, E = 1), weights = noise_NTE[(10*E/m1 + 2):1001])
 coef(NTE2_model)
 vcov(NTE2_model)
 summary(NTE2_model, cor = TRUE)
 # Now try to fit NTE1 model with the artificial data
-NTE1_model = nlsLM(art_data ~ Y0 + f_NTE1(dose, m1, m2, E), data = mod_df, start = list(m1 = 1, m2 = 0.1, E = 1), weights = noise_NTE1[(10*E/m1 + 2):1001])
+NTE1_model = nlsLM(art_data ~ Y0 + f_NTE1(dose, m1, m2, E), data = mod_df, start = list(m1 = 1, m2 = 0.1, E = 1), weights = noise_NTE[(10*E/m1 + 2):1001])
 coef(NTE1_model)
 vcov(NTE1_model)
 summary(NTE1_model, cor = TRUE)
@@ -99,8 +98,8 @@ L_square = function(f, m1, m2, E) {
 L_NTE2 = L_square(f_NTE2, m1 = coef(NTE2_model)[1], m2 = coef(NTE2_model)[2], E = coef(NTE2_model)[3])
 L_NTE1 = L_square(f_NTE1, m1 = coef(NTE1_model)[1], m2 = coef(NTE1_model)[2], E = coef(NTE1_model)[3])
 # Derive residual squared sum
-RSS_NTE1 = sum(L_NTE1)
-RSS_NTE2 = sum(L_NTE2)
+RSS_NTE1 = sum(noise_NTE[(10*E/m1 + 2):1001]*L_NTE1)
+RSS_NTE2 = sum(noise_NTE[(10*E/m1 + 2):1001]*L_NTE2)
 RSS_NTE1
 RSS_NTE2
 ```
@@ -119,4 +118,12 @@ NTE1_BIC = BIC_f(RSS = RSS_NTE1)
 NTE2_BIC = BIC_f(RSS = RSS_NTE2)
 ic_df = data.frame(AIC = c(NTE1_AIC, NTE2_AIC), BIC = c(NTE1_BIC, NTE2_BIC), row.names = c("NTE1 model", "NTE2 model"))
 ic_df
+```
+
+```{r, echo = TRUE}
+# Effect of Y0 on IC
+# When Y0 = 0.1, NTE1 in (0,100), NTE2 in (-100,-50)
+# When Y0 = 0.01, NTE1 in (-2400,-2000), NTE2 in (-4700,-4600)
+# When Y0 = 0.001, NTE1 in (-2600,-1800), NTE2 in (-8000,-7400)
+# When Y0 = 0.0001, NTE1 in (-2600,-1800), NTE2 in (-8000,-7400)
 ```
