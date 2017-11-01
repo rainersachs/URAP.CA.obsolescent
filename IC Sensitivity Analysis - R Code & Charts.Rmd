@@ -1,0 +1,526 @@
+---
+title: "Actual Data IC"
+author: "Julien YU"
+date: "2017/10/27"
+output: html_document
+---
+
+```{r, echo = TRUE}
+#All the libraries needed for this script
+library(deSolve) #library for solving differential equations
+library(minpack.lm) #for non-linear regression package
+
+#Generate actual data from Cacao (58 data spots)
+Oxygen = data.frame(d = c(0, .0125, .02, .025, .05, .075, .1, .2, .4), CA = c(.24, 1.66, 2.43, 2.37, 1.16, 2.85, 2.58, 6.94, 6.91))
+Si = data.frame(d = c(0, .02, .04, .06, .08, .1, .12, .2, .4, .8, 1.2), CA = c(.11, 1.26, 1.14, 1.58, 1.22, 1.89, 3.47, 4.6, 9.79, 27.01, 38.84))
+Fe600 = data.frame(d = c(0, .01, .02, .04, .06, .08, .1, .12, .2, .4, .8), CA = c(.13, .76, .99, 1.2, 1.74, 1.28, 1.2, 1.7, 3.02, 5.52, 12.42))
+Fe450 = data.frame(d = c(0, .02, .04, .06, .08, .1, .2, .4), CA = c(0, .86, .6, .8, 1.22, 2.02, 2.3, 4.77))
+Fe300 = data.frame(d = c(0, .005, .01,  0.02, .04, .07, .1, .2, .4, .8), CA = c(0.41, 1.23, 1.47, 1.22, .97, 1.46, 1.21, 4.38, 6.22, 13.6))
+Ti = data.frame(d = c(0,  0.02, .04, .06, .08, .1, .15, .3, .6), CA = c(0, 1.99, 1.88, 1.44, 2.67, 2.57, 2.50, 5.64, 11.19))
+param = data.frame(ion = c("O", "Si", "Ti", "Fe600", "Fe450", "Fe300"), Z = c(8, 14, 22, 26, 26, 26), L = c(75, 100, 125, 175, 195, 240), Z.beta = c(595, 690, 770, 1075, 1245, 1585))
+
+#Construct one big data frame
+big_df = rbind(Oxygen, Si, Ti, Fe600, Fe450, Fe300)
+big_df$Z = rep(param$Z, times = c(9, 11, 9, 11, 8, 10))
+big_df$Z.beta = rep(param$Z.beta, times = c(9, 11, 9, 11, 8, 10))
+big_df$L = rep(param$L, times = c(9, 11, 9, 11, 8, 10))
+big_df$error = c(0.24, 0.63, 0.77, 0.75, 0.52, 0.82, 0.78, 1.31, 1.59, 0.12, 0.05, 0.07, 0.56, 0.18, 0.60, 1.23, 1.60, 1.55, 4.27, 7.21, 0, 0.70, 0.66, 0.59, 0.80, 0.78, 0.48, 1.15, 2.39, 0.16, 0.38, 0.24, 0.21, 0.02, 0.37, 0.54, 0.17, 0.55, 1.75, 2.59, 0, 0.43, 0.34, 0.40, 0.50, 0.64, 0.73, 1.09, 0.29, 0.55, 0.60, 0.55, 0.49, 0.60, 0.54, 1.03, 1.22, 3.62)
+big_df$ion = rep(param$ion, times = c(9, 11, 9, 11, 8, 10))
+
+#Construct modified data frame to get rid of zero dose points (52 spots)
+modified_df = big_df[big_df$d != 0, ]
+modified_df$CA = modified_df$CA*0.01
+modified_df$error = modified_df$error*0.01
+big_df$CA = big_df$CA * 0.01
+big_df$error = big_df$error * 0.01
+big_df$errorbar_lower = big_df$CA - big_df$error
+big_df$errorbar_upper = big_df$CA + big_df$error
+```
+
+```{r, echo = TRUE}
+#TE and NTE function construction
+TE_function = function(d, L, Z.beta, sig0, kap, alpg = 0.041, Y0 = 0.00007) {
+  P = (1-exp(-Z.beta/kap))^2
+  sig = sig0*P + alpg*L/6.242*(1 - P)
+  Y0 + (6.242*(d/L))*sig*(1 - exp(-6.242*(d/L)*162))
+}
+
+NTE_function = function(d, L, Z.beta, eta0, eta1, sig0, kap, alpg = 0.041, Y0 = 0.00007) {
+  P = (1-exp(-Z.beta/kap))^2
+  sig = sig0*P + alpg*L/6.242*(1 - P)
+  eta = eta0*L*exp(-eta1*L)
+  Y0 + (6.242*(d/L))*sig*(1 - exp(-6.242*(d/L)*162)) + eta*(1 - exp(-d*10^5))
+}
+```
+
+```{r, echo = TRUE}
+#nls estimation for TE and NTE models
+TE_model = nlsLM(CA ~ TE_function(d, L, Z.beta, sig0, kap), data = modified_df, start = list(sig0 = 4.2, kap = 469), weights = (1/(modified_df$error)^2))
+coef(TE_model)
+vcov(TE_model)
+summary(TE_model, cor = TRUE)
+
+NTE_model = nlsLM(CA ~ NTE_function(d, L, Z.beta, eta0, eta1, sig0, kap), data = modified_df, start = list(eta0 = 0.00015, eta1 = 0.0035, sig0 = 4.2, kap = 469), weights = (1/(modified_df$error)^2))
+coef(NTE_model)
+vcov(NTE_model)
+summary(NTE_model, cor = TRUE)
+```
+
+```{r, echo = TRUE}
+#Get the weighted squared residuals of all 52 data spots for TE and NTE.
+TE_RSS = function(func, sig0 = coef(TE_model)[1], kap = coef(TE_model)[2]){
+  a = vector(length = 0)
+  for (i in 1:length(modified_df[, 1])){
+    a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i], Z.beta = modified_df$Z.beta[i], sig0 = sig0, kap = kap))
+  }
+  return(a^2)
+}
+
+NTE_RSS = function(func, eta0 = coef(NTE_model)[1], eta1 = coef(NTE_model)[2], sig0 = coef(NTE_model)[3], kap = coef(NTE_model)[4]){
+  a = vector(length = 0)
+  for (i in 1:length(modified_df[, 1])){
+    a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i], Z.beta = modified_df$Z.beta[i], eta0 = eta0, eta1 = eta1, sig0 = sig0, kap = kap))
+  }
+  return(a^2)
+}
+
+L_TE = TE_RSS(TE_function)
+L_NTE = NTE_RSS(NTE_function)
+WRSS_TE = sum((1/modified_df$error^2)*L_TE)/52
+WRSS_NTE = sum((1/modified_df$error^2)*L_NTE)/52
+```
+
+```{r, echo = TRUE}
+#Derive AIC and BIC for TE and NTE
+AIC_function = function(RSS, k, n = length(modified_df[, 1])) {
+  n + n*log(2*pi) + n*log(RSS) + 2*(k+1)
+}
+BIC_function = function(RSS, k, n = length(modified_df[, 1])) {
+  n + n*log(2*pi) + n*log(RSS) + log(n)*(k+1)
+}
+TE_AIC = AIC_function(RSS = WRSS_TE, 2)
+NTE_AIC = AIC_function(RSS = WRSS_NTE, 4)
+TE_BIC = BIC_function(RSS = WRSS_TE, 2)
+NTE_BIC = BIC_function(RSS = WRSS_NTE, 4)
+information_critera_df = data.frame(AIC = c(TE_AIC, NTE_AIC), BIC = c(TE_BIC, NTE_BIC), row.names = c("TE model", "NTE model"))
+information_critera_df
+#Later in the sensitivity analysis, AIC_TE = 368.8715, AIC_NTE = 200.7308, AIC_TE - AIC_NTE = 168.1407 serves as the most important reference data. 
+ref = c("reference", 368.8715, 200.7308, 168.1407)
+```
+
+```{r, echo = TRUE}
+#Conclusions of sensitivity analysis begin here.
+
+#1. Change Background radiation
+Y0 = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+Y0[1] = 0.0000007 #1/100 times
+AIC_TE[1] = 369.3708
+AIC_NTE[1] = 200.7187
+Y0[2] = 0.000007 #1/10 times
+AIC_TE[2] = 369.3255
+AIC_NTE[2] = 200.7198
+Y0[3] = 0.00007 #standard case
+AIC_TE[3] = 368.8715
+AIC_NTE[3] = 200.7308
+Y0[4] = 0.0007 #10 times
+AIC_TE[4] = 364.2257
+AIC_NTE[4] = 200.8454
+Y0[5] = 0.007 #100 times
+AIC_TE[5] = 303.1623
+AIC_NTE[5] = 202.8761
+Y0[7] = 0.07 #1000 times
+AIC_TE[7] = 513.8157
+AIC_NTE[7] = 221.4660
+Y0[6] = 0.0135 #Critical point
+AIC_TE[6] = 218.2054
+AIC_NTE[6] = 218.2736
+data.frame(Y0, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE)
+
+#The smallest nonzero CA recorded in the data frame is 0.0060. 
+
+#Conclusion: AIC_TE - AIC_NTE changes little when Y0<=0.00007 (the actual Y0 which is about one-hundredth of the lowest recorded CA). As Y0 grows, AIC_TE - AIC_NTE decreases and then increases. There exists a critical point of Y0 (around Y0=0.0135) that minimizes AIC_TE - AIC_NTE. TE could perform better than NTE in specific cases. 
+```
+
+```{r, echo = TRUE}
+#2. Add a data point with (small dose, small effect)
+
+#The data point with the lowest dose amount inside the data frame is in line 44 of modified_df, where dose = 0.0050 and CA = 0.0123. In the following analysis, one additional data point (with small dose and small CA) is added to the data frame. 
+
+#The base case will be to "double count" the Fe300 data point with dose = 0.0050, CA = 0.0123, error = 0.0055. 
+
+#Subcase 1: Fix dose amount (0.0050) and error (0.0055), change CA
+new_CA = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_CA[1] = 0.0123*0.2 #CA declines 80%
+AIC_TE[1] = 375.8526
+AIC_NTE[1] = 206.9587
+new_CA[2] = 0.0123*0.5 #CA declines 50%
+AIC_TE[2] = 375.8691
+AIC_NTE[2] = 205.7646
+new_CA[3] = 0.0123*0.7 #CA declines 30%
+AIC_TE[3] = 375.8883
+AIC_NTE[3] = 205.1689
+new_CA[4] = 0.0123 #Double count the base case i.e. (0.005, 0.0123)
+AIC_TE[4] = 375.9291
+AIC_NTE[4] = 204.5899
+new_CA[5] = 0.0123*1.4 #CA grows 40%
+AIC_TE[5] = 376.0061
+AIC_NTE[5] = 204.4222
+new_CA[6] = 0.0123*2 #CA grows 100%
+AIC_TE[6] = 376.1698
+AIC_NTE[6] = 205.4681
+new_CA[7] = 0.0123*5 #CA grows 400%
+AIC_TE[7] = 377.8317
+AIC_NTE[7] = 228.1033
+rbind(data.frame(new_CA, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 2: Fix CA (0.0123) and error (0.0055), change dose amount
+new_dose = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_dose[1] = 0.005*0.2 #Dose declines 80%
+AIC_TE[1] = 375.9299
+AIC_NTE[1] = 204.5888
+new_dose[2] = 0.005*0.5 #Dose declines 50%
+AIC_TE[2] = 375.9297
+AIC_NTE[2] = 204.5890
+new_dose[3] = 0.005*0.7 #Dose declines 30%
+AIC_TE[3] = 375.9295
+AIC_NTE[3] = 204.5893
+new_dose[4] = 0.005 #Double count the base case i.e. (0.005, 0.0123)
+AIC_TE[4] = 375.9291
+AIC_NTE[4] = 204.5899
+new_dose[5] = 0.005*1.4 #Dose grows 40%
+AIC_TE[5] = 375.9283
+AIC_NTE[5] = 204.5910
+new_dose[6] = 0.005*2 #Dose grows 100%
+AIC_TE[6] = 375.9266
+AIC_NTE[6] = 204.5933
+new_dose[7] = 0.005*5 #Dose grows 400%
+AIC_TE[7] = 375.9109
+AIC_NTE[7] = 204.6171
+rbind(data.frame(new_dose, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 3: Fix dose amount (0.0050) and CA (0.0123), change error
+new_error = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_error[1] = 0.0055*0.2 #Error declines 80%
+AIC_TE[1] = 377.7976
+AIC_NTE[1] = 207.6997
+new_error[2] = 0.0055*0.5 #Error declines 50%
+AIC_TE[2] = 376.1663
+AIC_NTE[2] = 205.1205
+new_error[3] = 0.0055*0.7 #Error declines 30%
+AIC_TE[3] = 376.0115
+AIC_NTE[3] = 204.7809
+new_error[4] = 0.0055 #Double count the base case i.e. (0.005, 0.0123)
+AIC_TE[4] = 375.9291
+AIC_NTE[4] = 204.5899
+new_error[5] = 0.0055*1.4 #Error grows 40%
+AIC_TE[5] = 375.8902
+AIC_NTE[5] = 204.4972
+new_error[6] = 0.0055*2 #Error grows 100%
+AIC_TE[6] = 375.8696
+AIC_NTE[6] = 204.4472
+new_error[7] = 0.0055*5 #Error grows 400%
+AIC_TE[7] = 375.8529
+AIC_NTE[7] = 204.4065
+rbind(data.frame(new_error, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 4: Fix dose amount, CA and error, change type of radiation
+#Again, note that the base case is to add a Fe300 data point. 
+rad_type = rep(0,6)
+AIC_TE = rep(0,6)
+AIC_NTE = rep(0,6)
+rad_type[1] = "Oxygen"
+AIC_TE[1] = 375.9275
+AIC_NTE[1] = 204.5339
+rad_type[2] = "Silicon"
+AIC_TE[2] = 375.9282
+AIC_NTE[2] = 204.4164
+rad_type[3] = "Titanium"
+AIC_TE[3] = 375.9286
+AIC_NTE[3] = 204.4015
+rad_type[4] = "Fe600"
+AIC_TE[4] = 375.9289
+AIC_NTE[4] = 204.4898
+rad_type[5] = "Fe450"
+AIC_TE[5] = 375.9289
+AIC_NTE[5] = 204.5305
+rad_type[6] = "Fe300"
+AIC_TE[6] = 375.9291
+AIC_NTE[6] = 204.5899
+rbind(data.frame(rad_type, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Conclusion: For an additional data point with (small dose, small CA, small error), AIC_TE - AIC_NTE: 
+#1) Increases moderately and then decreases sharply as CA gets larger
+#2) Decreases very slightly as dose amount gets larger
+#3) Increases with decreasing slope as error (inverse weight) gets larger
+#4) Changes slightly as types of radiation change and all other variables fixed
+
+#Important: Adding a new data point with (small dose, small CA, small error) increases AIC_TE - AIC_NTE in all subcases #1, #2, #3, #4. 
+```
+
+```{r, echo = TRUE}
+#3. Add a data point with (small dose, large effect)
+
+#The data point with the lowest dose amount inside the data frame is in line 44 of modified_df, where dose = 0.0050. A typically (not extremely) large CA amount is in line 52 of modified_df, where CA = 0.1360. In the following analysis, one additional data point (with small dose and large CA) is added to the data frame. 
+
+#The base case will be to add a Fe300 data point with dose = 0.0050, CA = 0.1360, error = 0.0362. 
+
+#Subcase 1: Fix dose amount (0.0050) and error (0.0362), change CA
+new_CA = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_CA[1] = 0.1360*0.2 #CA declines 80%
+AIC_TE[1] = 375.8588
+AIC_NTE[1] = 204.4417
+new_CA[2] = 0.1360*0.5 #CA declines 50%
+AIC_TE[2] = 375.9067
+AIC_NTE[2] = 205.3095
+new_CA[3] = 0.1360*0.7 #CA declines 30%
+AIC_TE[3] = 375.9615
+AIC_NTE[3] = 206.4865
+new_CA[4] = 0.1360 #Double count the base case i.e. (0.005, 0.1360)
+AIC_TE[4] = 376.0778
+AIC_NTE[4] = 209.0725
+new_CA[5] = 0.1360*1.4 #CA grows 40%
+AIC_TE[5] = 376.2960
+AIC_NTE[5] = 213.8256
+new_CA[6] = 0.1360*2 #CA grows 100%
+AIC_TE[6] = 376.7569
+AIC_NTE[6] = 222.9596
+new_CA[7] = 0.1360*5 #CA grows 400%
+AIC_TE[7] = 381.2833
+AIC_NTE[7] = 275.4386
+rbind(data.frame(new_CA, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 2: Fix CA (0.1360) and error (0.0362), change dose amount
+new_dose = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_dose[1] = 0.005*0.2 #Dose declines 80%
+AIC_TE[1] = 376.0780
+AIC_NTE[1] = 209.0733
+new_dose[2] = 0.005*0.5 #Dose declines 50%
+AIC_TE[2] = 376.0779
+AIC_NTE[2] = 209.0731
+new_dose[3] = 0.005*0.7 #Dose declines 30%
+AIC_TE[3] = 376.0779
+AIC_NTE[3] = 209.0729
+new_dose[4] = 0.005 #Double count the base case i.e. (0.005, 0.1360)
+AIC_TE[4] = 376.0778
+AIC_NTE[4] = 209.0725
+new_dose[5] = 0.005*1.4 #Dose grows 40%
+AIC_TE[5] = 376.0776
+AIC_NTE[5] = 209.0718
+new_dose[6] = 0.005*2 #Dose grows 100%
+AIC_TE[6] = 376.0771
+AIC_NTE[6] = 209.0702
+new_dose[7] = 0.005*5 #Dose grows 400%
+AIC_TE[7] = 376.0728
+AIC_NTE[7] = 209.0541
+rbind(data.frame(new_dose, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 3: Fix dose amount (0.0050) and CA (0.1360), change error
+new_error = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_error[1] = 0.0362*0.2 #Error declines 80%
+AIC_TE[1] = 381.2752
+AIC_NTE[1] = 267.3317
+new_error[2] = 0.0362*0.5 #Error declines 50%
+AIC_TE[2] = 376.7560
+AIC_NTE[2] = 221.0168
+new_error[3] = 0.0362*0.7 #Error declines 30%
+AIC_TE[3] = 376.3141
+AIC_NTE[3] = 213.5316
+new_error[4] = 0.0362 #Double count the base case i.e. (0.005, 0.1360)
+AIC_TE[4] = 376.0778
+AIC_NTE[4] = 209.0725
+new_error[5] = 0.0362*1.4 #Error grows 40%
+AIC_TE[5] = 375.9662
+AIC_NTE[5] = 206.8353
+new_error[6] = 0.0362*2 #Error grows 100%
+AIC_TE[6] = 375.9068
+AIC_NTE[6] = 205.6068
+new_error[7] = 0.0362*5 #Error grows 400%
+AIC_TE[7] = 375.8589
+AIC_NTE[7] = 204.5939
+rbind(data.frame(new_error, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 4: Fix dose amount, CA and error, change type of radiation
+#Again, note that the base case is to add a Fe300 data point. 
+rad_type = rep(0,6)
+AIC_TE = rep(0,6)
+AIC_NTE = rep(0,6)
+rad_type[1] = "Oxygen"
+AIC_TE[1] = 376.0774
+AIC_NTE[1] = 209.5839
+rad_type[2] = "Silicon"
+AIC_TE[2] = 376.0775
+AIC_NTE[2] = 209.4334
+rad_type[3] = "Titanium"
+AIC_TE[3] = 376.0777
+AIC_NTE[3] = 209.3159
+rad_type[4] = "Fe600"
+AIC_TE[4] = 376.0777
+AIC_NTE[4] = 209.1602
+rad_type[5] = "Fe450"
+AIC_TE[5] = 376.0777
+AIC_NTE[5] = 209.1216
+rad_type[6] = "Fe300"
+AIC_TE[6] = 376.0778
+AIC_NTE[6] = 209.0725
+rbind(data.frame(rad_type, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Conclusion: For an additional data point with (small dose, small CA, small error), AIC_TE - AIC_NTE: 
+#1) Decreases with increasing slope as CA gets larger
+#2) Increases very slightly as dose amount gets larger
+#3) Increases with decreasing slope as error (inverse weight) gets larger
+#4) Changes slightly as types of radiation change and all other variables fixed
+
+#Important: Adding a new data point with (small dose, large CA, large error) increases AIC_TE - AIC_NTE in subcases #2, #4 and most of #1, #3. #In subcase #1, lower CAs sometimes decrease AIC_TE - AIC_NTE
+#In subcase #3, larger errors sometimes decrease AIC_TE - AIC_NTE
+
+#Vertical Comparison of data point B (i.e. small dose, large CA, large error) with data point A (i.e. small dose, small CA, small error): 
+
+#Important conclusion: Adding point A, compared to adding point B, is more in favor of the NTE model rather than the TE model. 
+```
+
+```{r, echo=TRUE}
+#4. Add a data point with (large dose, large effect)
+
+#The data point with a typically (not extremely) large CA amount is in line 52 of modified_df, where dose = 0.8000 and CA = 0.1360. In the following analysis, one additional data point (with large dose and large CA) is added to the data frame. 
+
+#The base case will be to "double count" the Fe300 data point with dose = 0.8000, CA = 0.1360, error = 0.0362. 
+
+#Subcase 1: Fix dose amount (0.8000) and error (0.0362), change CA
+new_CA = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_CA[1] = 0.1360*0.2 #CA declines 80%
+AIC_TE[1] = 378.1077
+AIC_NTE[1] = 205.8198
+new_CA[2] = 0.1360*0.5 #CA declines 50%
+AIC_TE[2] = 377.7249
+AIC_NTE[2] = 204.6363
+new_CA[3] = 0.1360*0.7 #CA declines 30%
+AIC_TE[3] = 377.4885
+AIC_NTE[3] = 204.3990
+new_CA[4] = 0.1360 #Double count the base case i.e. (0.800, 0.1360)
+AIC_TE[4] = 377.1627
+AIC_NTE[4] = 204.8728
+new_CA[5] = 0.1360*1.4 #CA grows 40%
+AIC_TE[5] = 376.7828
+AIC_NTE[5] = 206.9717
+new_CA[6] = 0.1360*2 #CA grows 100%
+AIC_TE[6] = 376.3324
+AIC_NTE[6] = 212.7521
+new_CA[7] = 0.1360*5 #CA grows 400%
+AIC_TE[7] = 376.2956
+AIC_NTE[7] = 258.3051
+rbind(data.frame(new_CA, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 2: Fix CA (0.1360) and error (0.0362), change dose amount
+new_dose = rep(0,6)
+AIC_TE = rep(0,6)
+AIC_NTE = rep(0,6)
+new_dose[1] = 0.8*0.2 #Dose declines 80%
+AIC_TE[1] = 375.9437
+AIC_NTE[1] = 208.4822
+new_dose[2] = 0.8*0.5 #Dose declines 50%
+AIC_TE[2] = 375.9033
+AIC_NTE[2] = 206.8124
+new_dose[3] = 0.8*0.7 #Dose declines 30%
+AIC_TE[3] = 376.2280
+AIC_NTE[3] = 205.8395
+new_dose[4] = 0.8 #Double count the base case i.e. (0.800, 0.1360)
+AIC_TE[4] = 377.1627
+AIC_NTE[4] = 204.8728
+new_dose[5] = 0.8*1.4 #Dose grows 40%
+AIC_TE[5] = 378.9228
+AIC_NTE[5] = 204.4051
+new_dose[6] = 0.8*2 #Dose grows 100%
+AIC_TE[6] = 382.0571
+AIC_NTE[6] = 204.8636
+#Warning: Multiplying a large dose amount (i.e. 0.8) by 5 makes the data point inapplicable and illegible by R. Hence, we drop it. 
+rbind(data.frame(new_dose, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 3: Fix dose amount (0.8000) and CA (0.1360), change error
+new_error = rep(0,7)
+AIC_TE = rep(0,7)
+AIC_NTE = rep(0,7)
+new_error[1] = 0.0362*0.2 #Error declines 80%
+AIC_TE[1] = 387.5604
+AIC_NTE[1] = 206.9349
+new_error[2] = 0.0362*0.5 #Error declines 50%
+AIC_TE[2] = 379.9671
+AIC_NTE[2] = 205.7393
+new_error[3] = 0.0362*0.7 #Error declines 30%
+AIC_TE[3] = 378.2856
+AIC_NTE[3] = 205.2492
+new_error[4] = 0.0362 #Double count the base case i.e. (0.800, 0.1360)
+AIC_TE[4] = 377.1627
+AIC_NTE[4] = 204.8728
+new_error[5] = 0.0362*1.4 #Error grows 40%
+AIC_TE[5] = 376.5544
+AIC_NTE[5] = 204.6564
+new_error[6] = 0.0362*2 #Error grows 100%
+AIC_TE[6] = 376.2051
+AIC_NTE[6] = 204.5294
+new_error[7] = 0.0362*5 #Error grows 400%
+AIC_TE[7] = 375.9080
+AIC_NTE[7] = 204.4202
+rbind(data.frame(new_error, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Subcase 4: Fix dose amount, CA and error, change type of radiation
+#Still again, note that the base case is to add a Fe300 data point. 
+rad_type = rep(0,6)
+AIC_TE = rep(0,6)
+AIC_NTE = rep(0,6)
+rad_type[1] = "Oxygen"
+AIC_TE[1] = 376.9615
+AIC_NTE[1] = 204.6850
+rad_type[2] = "Silicon"
+AIC_TE[2] = 376.8147
+AIC_NTE[2] = 204.4432
+rad_type[3] = "Titanium"
+AIC_TE[3] = 376.6709
+AIC_NTE[3] = 204.4032
+rad_type[4] = "Fe600"
+AIC_TE[4] = 376.9509
+AIC_NTE[4] = 204.5233
+rad_type[5] = "Fe450"
+AIC_TE[5] = 377.1316
+AIC_NTE[5] = 204.5998
+rad_type[6] = "Fe300"
+AIC_TE[6] = 377.1627
+AIC_NTE[6] = 204.8728
+rbind(data.frame(rad_type, AIC_TE, AIC_NTE, AIC_TE-AIC_NTE), ref)
+
+#Conclusion: For an additional data point with (large dose, large CA, large error), AIC_TE - AIC_NTE: 
+#1) Increases moderately and then decreases sharply as CA gets larger
+#2) Increases moderately as dose amount gets larger
+#3) Decreases with increasing slope as error (inverse weight) gets larger
+#4) Changes slightly as types of radiation change and all other variables fixed
+
+#Important: Adding a new data point with (large dose, large CA, large error) increases AIC_TE - AIC_NTE in subcases #3, #4 and most of #1, #2. #In subcase #1, very high CAs decreases AIC_TE - AIC_NTE significantly
+#In subcase #2, small dose amounts sometimes decrease AIC_TE - AIC_NTE
+
+#Vertical Comparison of data point C (i.e. large dose, large CA, large error) with data point B (i.e. small dose, large CA, large error) and data point A (i.e. small dose, small CA, small error): 
+
+#Important conclusion: Adding point C, compared to adding point B, is much more in favor of the NTE model; compared to adding point A, adding C is more in favor of the NTE model. 
+
+#The central conclusion of the file: 
+#Consider three data points to be added to the data frame, AIC_TE - AIC_NTE measures the extent to which each data point is in favor of the NTE model rather than the TE model. 
+#Point A (i.e. small dose, small CA, small error)
+#Point B (i.e. small dose, large CA, large error)
+#Point C (i.e. large dose, large CA, large error)
+#Then in terms of the extent to which NTE is better than TE: 
+#C > A > B
+```
