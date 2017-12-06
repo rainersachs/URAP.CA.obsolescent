@@ -63,7 +63,7 @@ NTE2_function = function(d, L, Z.b, eta0 = 0.00047, eta1 = 0.011, sig0 = 6.75, k
 #Modifying NTE1 and NTE2 by insisting they be twice continuously differentiable and monotonic increasing. Double check NTE1, NTE2, Our model
 IDER = function(d, L, Z.b, eta0, eta1, sig0, kap) {
   P = (1-exp(-Z.b/kap))^2
-  sig = sig0*P + 0.041/6.24*L*(1-P) # rks to rks: check where 0.041 comes from and if it is correct.
+  sig = sig0*P + 0.041/6.24*L*(1-P) # 0.041 +- 0.0051 comes from 16Cacao
   eta = eta0*L*exp(-eta1*L)
   0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
 } 
