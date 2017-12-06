@@ -1,12 +1,13 @@
 #This is free, open-source software under the (lenient) GNU GPLv3. It comes with no warranty. 
-#It was written by Dae Woong Ham between Sept. 2016 and May 2017. Some quality control by Rainer Sachs May-August 2017.
-#It concerns synergy analysis of WGE simple chromosome aberrations (CA) induced in 82-6 fibroblast cells by simulated GCR (Galactic Cosmic Radiation) mixed fields. It is an R version of parts of GCRfibroCA2GH.Rmd
+#.Rmd version was written by Dae Woong Ham between Sept. 2016 and May 2017. Some quality control by Rainer (Ray) K. Sachs (rks) May-August 2017.
+# This R version was written by Liyang (Andy) Zhao (laz) UCB semester fall 2017. Some quality control by rks.
+#Script concerns synergy analysis of WGE simple chromosome aberrations (CA) induced in 82-6 fibroblast cells by simulated GCR (Galactic Cosmic Radiation) mixed fields. It is an R version of parts of GCRfibroCA2GH.Rmd
 #The script uses various mixture component IDERs (Individual Dose Effect Relations), including some in the following paper. 
 #"16Cacao" = Cacao, Hada, Saganti, George and Cucinotta. "Relative Biological Effectiveness of HZE Particles for Chromosomal Exchanges and Other Surrogate Cancer Risk Endpoints." PLoS One 11(4): e0153998. (2016)],
 #The libraries needed for this script
 library(deSolve) # package for solving differential equations
-library(minpack.lm) # package for non-linear regression
-library(mvtnorm) # package for calculating confidence interval
+library(minpack.lm) # package for non-linear regression #rks to laz: I think we probably can just use nls() in stats, not nlsLM from linpack. Please check in R documentation if there is any functional difference at all
+library(mvtnorm) # package for calculating confidence intervals by Monte Carlo simulation based on variance-covariance matrices #rks to laz: I added to comment.Please check that my addition is OK.
 rm(list=ls())
 
 #Create dataframes that store the fibroblast WGE simple CA data used in 16Cacao 
@@ -44,7 +45,7 @@ big_df$error = big_df$error * 0.01
 big_df$errorbar_lower = big_df$CA - big_df$error
 big_df$errorbar_upper = big_df$CA + big_df$error
 
-#NTE1 and NTE2 models in 16Cacao using their parameters. NTE is used in 16Cacao to signify that non-targeted effects are included in the model; Conventional targetted effects (TE) are included in all models.
+#NTE1 and NTE2 models in 16Cacao using their parameters. NTE is used in 16Cacao to signify that non-targeted effects are included in the model; Conventional targeted effects (TE) are included in all models.
 #NTE1 function
 NTE1_function = function(d, L, Z.b, eta0 = 0.00011, eta1 = 0.007, sig0 = 6.12, kap = 796) {
   0.0017 + eta0*L*exp(-eta1*L)*(d != 0) + 
@@ -75,7 +76,7 @@ coef(IDER_model)
 vcov(IDER_model)# variance-covariance matrix, needed later for analyzing 95% confidence limits in baseline no-synergy/no-antagonism MIXDER (Mixture dose effect relation)
 summary(IDER_model, cor = TRUE) #model parameters and their correlation matrix
 
-#R function to give Information criteria (AIC and BIC)
+#R function to give Information criteria (AIC and BIC) #rks to laz: R has AIC functions. Please check that they give the same ordering (not necessarily the same values) as the ones constructed below by Dae or you.
 #L_function gives the residuals squared
 L_function = function(func, eta0, eta1, sig0, kap) {
   a = vector(length = 0)
