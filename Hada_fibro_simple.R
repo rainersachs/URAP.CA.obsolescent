@@ -2,7 +2,7 @@
 #.Rmd version was written by Dae Woong Ham between Sept. 2016 and May 2017. Some quality control by Rainer (Ray) K. Sachs (rks) May-August 2017.
 # This R version was written by Liyang (Andy) Zhao (laz) UCB semester fall 2017. Some quality control by rks and Julien Yu
 #Script concerns synergy analysis of WGE simple chromosome aberrations (CA) induced in 82-6 fibroblast cells by simulated GCR (Galactic Cosmic Radiation) mixed fields. It is an R version of parts of GCRfibroCA2GH.Rmd
-#The script uses various mixture component IDERs (Individual Dose Effect Relations), including some in the following paper. 
+#The script uses various mixture component IDERs (Individual Dose Effect Relations), including some in the following papers. 
 #"16Cacao" = Cacao, Hada, Saganti, George and Cucinotta. "Relative Biological Effectiveness of HZE Particles for Chromosomal Exchanges and Other Surrogate Cancer Risk Endpoints." PLoS One 11(4): e0153998. (2016)],
 #The libraries needed for this script
 library(deSolve) # package for solving differential equations
@@ -28,7 +28,7 @@ param = data.frame(ion = c("O", "Si", "Ti", "Fe600", "Fe450", "Fe300"),
                    Z = c(8, 14, 22, 26, 26, 26), L = c(75, 100, 125, 175, 195, 240), #Z=atomic charge; L=LET
                    Z.b = c(595, 690, 770, 1075, 1245, 1585))#Z^2/beta*^2
 
-#putting it in one big data frame
+#putting it in one big data frame. #rks: the data frame incorporates a correction to Fe600 at dose 0.06, near line 34
 big_df = rbind(Oxygen, Si, Ti, Fe600, Fe450, Fe300)
 big_df$Z = rep(param$Z, times = c(9, 11, 9, 11, 8, 10))
 big_df$Z.b = rep(param$Z.b, times = c(9, 11, 9, 11, 8, 10))
