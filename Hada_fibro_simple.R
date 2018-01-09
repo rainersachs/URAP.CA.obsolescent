@@ -68,7 +68,7 @@ IDER = function(d, L, Z.b, eta0, eta1, sig0, kap) {
   0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
 } 
 
-#nls (non-linear least square) method to get the parameters needed (4 parameter estimation)
+#nls (non-linear least square) method to get the parameters needed (4 parameter estimation) #rks to laz: see note under issues
 IDER_model = nlsLM(CA ~ IDER(d, L, Z.b, eta0, eta1, sig0, kap), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap = 500), 
                    weights = (1/(modified_df$error)^2))
 coef(IDER_model)
