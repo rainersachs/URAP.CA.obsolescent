@@ -11,6 +11,7 @@ library(deSolve) # package for solving differential equations
 library(minpack.lm) # package for non-linear regression #rks to laz: I think we probably can just use nls() in stats, not nlsLM from linpack. Please check in R documentation if there is any functional difference at all
 library(mvtnorm) #package for calculating confidence intervals by Monte Carlo simulation based on variance-covariance matrices #rks to laz: I added to comment.Please check that my addition is OK.
 library(dplyr)
+library(ggplot2)
 rm(list=ls())
 ```
 
@@ -72,7 +73,7 @@ TE_function = function(d, L, beta) {
 new_Q_IDER_model_TEonly = nlsLM(CA ~ TE_function(d, L,beta), data = modified_df, start = list(beta=3), 
                        weights = (1/(modified_df$error)^2))
 
-NTE1_function = function(d, L, eta0, eta1, beta) {
+NTE_Q_function = function(d, L, eta0, eta1, beta) {
   Flux=6.242*d/L # rks to laz and spw. This is proposed NTE-TE model for lymphocytes
   A = 30 #The area of the cell nucleus for lymphocytes
   H=A*Flux 
@@ -80,17 +81,17 @@ NTE1_function = function(d, L, eta0, eta1, beta) {
   0.0104 + beta*Flux*(1-exp(-H)) + eta*(1-exp(-d/d_0))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
 } 
 #nls (non-linear least square) method to get the parameters needed (4 parameter estimation)
-new_Q_IDER_model = nlsLM(CA ~ NTE1_function(d, L, eta0, eta1, beta), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, beta=3),
+new_Q_IDER_model = nlsLM(CA ~ NTE_Q_function(d, L, eta0, eta1, beta), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, beta=3),
                  weights = (1/(modified_df$error)^2))
 
-NTE2_function = function(d, L, eta0, eta1,alpha, beta) {
+NTE_LQ_function = function(d, L, eta0, eta1,alpha, beta) {
   Flux=6.242*d/L # rks to laz and spw. This is proposed NTE-TE model for lymphocytes
   A = 30 #The area of the cell nucleus for lymphocytes
   H=A*Flux 
   eta = eta0*L*exp(-eta1*L) # Eq. 9 in 18dev_bet
   0.0104 +(alpha/d+ beta)*Flux*(1-exp(-H)) + eta*(1-exp(-d/d_0)) 
 } 
-new_LQ_IDER_model = nlsLM(CA ~ NTE2_function(d, L, eta0, eta1,alpha, beta), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, alpha=0.3, beta=2), 
+new_LQ_IDER_model = nlsLM(CA ~ NTE_LQ_function(d, L, eta0, eta1,alpha, beta), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, alpha=0.3, beta=2), 
                        weights = (1/(modified_df$error)^2))
 ```
 
@@ -121,13 +122,13 @@ summary(new_LQ_IDER_model)
 ##AIC & BIC
 ```{r}
 L_TE <- resid(new_Q_IDER_model_TEonly) ** 2
-L_NTE1 <- resid(new_Q_IDER_model) ** 2
-L_NTE2 <- resid(new_LQ_IDER_model) ** 2
+L_NTE_Q <- resid(new_Q_IDER_model) ** 2
+L_NTE_LQ <- resid(new_LQ_IDER_model) ** 2
 L_IDER <- resid(IDER_model) ** 2
 #Since all models are weighted least square regression, will weight our model with our weights to get the WRSS (weighted residual squared sum)
 WRSS_TE = sum((1/modified_df$error^2)*L_TE)
-WRSS_NTE1 = sum((1/modified_df$error^2)*L_NTE1)
-WRSS_NTE2 = sum((1/modified_df$error^2)*L_NTE2)
+WRSS_NTE_Q = sum((1/modified_df$error^2)*L_NTE_Q)
+WRSS_NTE_LQ = sum((1/modified_df$error^2)*L_NTE_LQ)
 WRSS_IDER = sum((1/modified_df$error^2)*L_IDER)
 
 #functions for AIC and BIC calculation for Weighted Least Square regression
@@ -139,16 +140,76 @@ BIC_function = function(n = length(modified_df[, 1]), k = 4, RSS) {
   n + n*log(2*pi) + n*log(RSS/n) + log(n)*(k+1)
 }
 TE_AIC = AIC_function(RSS = WRSS_TE, k = 1)
-NTE1_AIC = AIC_function(RSS = WRSS_NTE1, k = 3)
-NTE2_AIC = AIC_function(RSS = WRSS_NTE2)
+NTE_Q_AIC = AIC_function(RSS = WRSS_NTE_Q, k = 3)
+NTE_LQ_AIC = AIC_function(RSS = WRSS_NTE_LQ)
 IDER_AIC = AIC_function(RSS = WRSS_IDER)
 TE_BIC = BIC_function(RSS = WRSS_TE, k = 1)
-NTE1_BIC = BIC_function(RSS = WRSS_NTE1, k = 3)
-NTE2_BIC = BIC_function(RSS = WRSS_NTE2)
+NTE_Q_BIC = BIC_function(RSS = WRSS_NTE_Q, k = 3)
+NTE_LQ_BIC = BIC_function(RSS = WRSS_NTE_LQ)
 IDER_BIC = BIC_function(RSS = WRSS_IDER)
 
-information_critera_df = data.frame(Model = c("TE model","NTE1 model", "NTE2 model", "IDER model"), AIC = c(TE_AIC, NTE1_AIC, NTE2_AIC, IDER_AIC), BIC = c(TE_BIC, NTE1_BIC, NTE2_BIC, IDER_BIC))
+information_critera_df = data.frame(Model = c("TE model","NTE_Q model", "NTE_LQ model", "IDER model"), AIC = c(TE_AIC, NTE_Q_AIC, NTE_LQ_AIC, IDER_AIC), BIC = c(TE_BIC, NTE_Q_BIC, NTE_LQ_BIC, IDER_BIC))
 arrange(information_critera_df, AIC)
 ```
 
-Apparently TE did the worst, which is surprising. I think there might be issues with the original AIC and BIC functions, or maybe TE should be calculated in a different way (I already changed the k value to 1)
+Apparently TE did the worst, which is surprising. I think there might be issues with the original AIC and BIC functions, or maybe TE should be calculated in a different way (I already changed the k value to 1).
+
+##Baseline no-synergy/no-antagonism MIXTE
+```{r}
+beta0 <- as.numeric(coef(new_Q_IDER_model_TEonly))
+TE_O <- function(d) TE_function(d, L = 75, beta = beta0)
+TE_Si <- function(d) TE_function(d, L = 100, beta = beta0)
+TE_Fe600 <- function(d) TE_function(d, L = 175, beta = beta0)
+
+ggplot(modified_df[modified_df$ion == "O", ], aes(x = d, y = CA)) + geom_point() + stat_function(fun = TE_O)
+ggplot(modified_df[modified_df$ion == "Si", ], aes(x = d, y = CA)) + geom_point() + stat_function(fun = TE_Si)
+ggplot(modified_df[modified_df$ion == "Fe600", ], aes(x = d, y = CA)) + geom_point() + stat_function(fun = TE_Fe600)
+```
+
+```{r}
+MIXTE_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), beta = beta0){
+  dE = function(yini, State, Pars){
+    n = length(L)
+    beta = beta0
+    with(as.list(c(State, Pars)), {
+      u = numeric(n)
+      for (i in 1:n){
+        u[i] = uniroot(function(d) {beta *6.242*d/L[i]*(1 - exp(-30*6.242*d/L[i])) - I}, lower = 0, upper = 0.4, extendInt = "yes", tol = 10^-10)$root
+      }
+      dI = numeric(n)
+      H = numeric(n)
+      for(i in 1:n){
+        H[i] = 6.24*30*u[i]/L[i]
+        dI[i] = r[i]*(beta * 6.24/L[i] * exp(-H[i]) * (exp(H[i]) + H[i] - 1)) #Partial derivative of TE function over d. This is always 0 when d = 0 though.
+      }
+      dI = sum(dI)
+      return(list(c(dI)))
+    })
+  }
+  pars = NULL; yini = c(I = 0); d = d
+  out = ode(yini,times = d, dE, pars, method = "radau")
+  return(out)
+}
+
+```
+
+```{r}
+#Here is the TE function again for individual dose
+TE_function = function(d, L, beta) {
+  Flux=6.242*d/L # Eq. (5a) in 18_dev_bet; a model-independent equation for particle flux
+  A = 30 #The area of the cell nucleus for lymphocytes
+  H=A*Flux 
+  0 + beta*Flux*(1-exp(-H))
+}
+r = rep(1/3, 3); L = c(75, 100, 175); Z.b = c(595, 690, 1075); dose = seq(0,.4,by=0.001)
+MX = MIXTE_function(r, L, Z.b, d = dose)
+plot(MX[,1],MX[,2],type='l',bty='l',col='red',ann='F',ylim=c(0,0.5))
+for (ii in 1:length(L)){lines(dose,TE_function(dose,L[ii],beta = beta0),col='green')}
+#SEA
+SEA=function(d){
+  TE_function(d = d/3,L[1], beta = beta0)+TE_function(d/3,L[2],beta = beta0)+TE_function(d/3,L[3],beta = beta0)
+}
+lines(dose,SEA(dose),lty=2)
+```
+
+
