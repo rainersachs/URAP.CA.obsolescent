@@ -212,5 +212,76 @@ SEA=function(d){
 }
 lines(dose,SEA(dose),lty=2)
 ```
+##Getting a sample of parameters (n = 500)
+```{r}
+sig = vcov(new_Q_IDER_model_TEonly)
+set.seed(10)
+monte_carlo_parameters = rmvnorm(n = 500, mean = c(alpha = alpha0, beta = beta0), sigma = sig)
+alpha0_MC = monte_carlo_parameters[, 1]
+beta0_MC = monte_carlo_parameters[, 2]
+```
 
+##Monte Carlo CI
+```{r}
+CI_function_MIXTE = function(d, r, interval = 0.95, L, Z.beta, alphas = alpha0_MC, betas = beta0_MC) {
+  MIXTE_curve = list(length = 0)
+  for (i in 1:500) {
+    MIXTE_curve[[i]] = MIXTE_function(r, L, Z.b, d = d, alpha = alphas[i], beta = betas[i])
+  }
+  info = vector(length = 0)
+  for (i in 1:500) {
+    info = c(info, MIXTE_curve[[i]][, 2][2])
+  }
+  info = sort(info)
+  lower_bound = quantile(info, (1-interval)/2)
+  upper_bound = quantile(info, 1 - (1-interval)/2)
+  CI = c(lower_bound, upper_bound)
+  return(CI)
+}
+```
+
+##2-ion Mix, Silicon and Fe600
+```{r}
+out = MIXTE_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)))
+two_ion_MIXTE1 = data.frame(d = out[, 1], CA = out[, 2])
+two_ion_MIXTE2 = data.frame(d = out[, 1][seq(11,60, by = 5)], CA = out[, 2][seq(11,60, by = 5)])
+d1 =two_ion_MIXTE1$d
+d2 =two_ion_MIXTE2$d
+```
+
+```{r}
+v2 <- data.frame(lower = vector(length = length(d2)),upper = vector(length = length(d2)))
+#Then the 95% CI multivariate MC simulated ribbon
+ninty_five_CI_lower = vector(length = 0)
+ninty_five_CI_upper = vector(length = 0)
+a = vector(length = 0)
+for (i in 1:length(d2)) {
+  a = CI_function_MIXTE(d = c(0, d2[i]), r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
+  v2$lower[i-1] = a[1]
+  v2$upper[i-1] = a[2]
+  print(a)
+  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+}
+two_ion_MIXTE2$CI_lower = c(ninty_five_CI_lower)
+two_ion_MIXTE2$CI_upper = c(ninty_five_CI_upper)
+
+#Get the simple effect additivity MIXTE
+two_ion_MIXTE2$simpleeffect = TE_function(d = 0.5*d2, L = 100, alpha = alpha0, beta = beta0) + TE_function(d = 0.5*d2, L = 175, alpha = alpha0, beta = beta0)
+#Get the individual TE_functionS
+two_ion_MIXTE2$silicon = TE_function(d = d2, L = 100, alpha = alpha0, beta = beta0)
+two_ion_MIXTE2$ironsix = TE_function(d = d2, L = 175, alpha = alpha0, beta = beta0)
+
+CA2 <- two_ion_MIXTE2$CA
+simpleeffect2 <- two_ion_MIXTE2$simpleeffect
+silicon2 <- two_ion_MIXTE2$silicon
+ironsix2 <- two_ion_MIXTE2$ironsix
+plot(x = d2 * 100, y = CA2 * 100, type = "l", col = "red")
+lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d2 * 100, y = silicon2* 100, col = "green")  
+lines(x = d2 * 100, y = ironsix2* 100, col = "green")
+lines(x= d2*100 , y = two_ion_MIXTE2$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d2*100 , y = two_ion_MIXTE2$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXTE2$CI_lower * 100, rev(two_ion_MIXTE2$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+```
 
