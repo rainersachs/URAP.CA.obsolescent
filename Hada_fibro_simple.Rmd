@@ -276,8 +276,8 @@ v1 <- data.frame(lower = vector(length = length(d1) ),upper = vector(length = le
 ninty_five_CI_lower = vector(length = 0)
 ninty_five_CI_upper = vector(length = 0)
 a = vector(length = 0)
-for (i in 2:length(d1)) {
-  a = CI_function_MIXDER(d = c(0, two_ion_MIXDER1$d[i]), d_interested = two_ion_MIXDER1$d[i], r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
+for (i in 1:length(d1)) {
+  a = CI_function_MIXDER_MC_2(d = c(0, two_ion_MIXDER1$d[i]), d_interested = two_ion_MIXDER1$d[i], r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
   v1$lower[i] = a[1]
   v1$upper[i] = a[2]
   print(a)
@@ -492,7 +492,6 @@ lines(x= d2*100 , y = six_ion_MIXDER$CI_upper_two * 100, lty = 'dashed', col = '
 lines(x= d2*100 , y = six_ion_MIXDER$CI_lower_two * 100, lty = 'dashed', col = 'red')
 polygon(c(d2*100,rev(d2*100)),c(six_ion_MIXDER$CI_lower_two * 100, rev(six_ion_MIXDER$CI_upper_two * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
-
 
 
 
