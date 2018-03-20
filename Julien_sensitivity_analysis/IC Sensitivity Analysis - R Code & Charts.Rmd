@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r, echo = TRUE}
-#All the libraries needed for this script
+#All the libraries needed for this script. Sachs says on 3/20/2018: could discard everything after line 144.
 library(deSolve) #library for solving differential equations
 library(minpack.lm) #for non-linear regression package
 
