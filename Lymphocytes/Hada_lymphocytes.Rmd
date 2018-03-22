@@ -168,7 +168,7 @@ ggplot(modified_df[modified_df$ion == "Fe600", ], aes(x = d, y = CA)) + geom_poi
 ```
 
 ```{r}
-MIXTE_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), alpha = alpha0, beta = beta0){
+MIXTE_function = function(r, L, d = seq(0, 0.2, by = 0.001), alpha = alpha0, beta = beta0){
   dE = function(yini, State, Pars){
     n = length(L)
     beta = beta0
@@ -202,8 +202,8 @@ TE_function = function(d, L, alpha, beta) {
   H=A*Flux 
   0 + (alpha + beta*Flux)*(1-exp(-H))
 }
-r = rep(1/3, 3); L = c(75, 100, 175); Z.b = c(595, 690, 1075); dose = seq(0,.4,by=0.001)
-MX = MIXTE_function(r, L, Z.b, d = dose)
+r = rep(1/3, 3); L = c(75, 100, 175); dose = seq(0,.4,by=0.001)
+MX = MIXTE_function(r, L, d = dose)
 plot(MX[,1],MX[,2],type='l',bty='l',col='red',ann='F',ylim=c(0,0.5))
 for (ii in 1:length(L)){lines(dose,TE_function(dose,L[ii], alpha = alpha0, beta = beta0),col='green')}
 #SEA
@@ -223,10 +223,10 @@ beta0_MC = monte_carlo_parameters[, 2]
 
 ##Monte Carlo CI
 ```{r}
-CI_function_MIXTE = function(d, r, interval = 0.95, L, Z.beta, alphas = alpha0_MC, betas = beta0_MC) {
+CI_function_MIXTE = function(d, r, interval = 0.95, L, alphas = alpha0_MC, betas = beta0_MC) {
   MIXTE_curve = list(length = 0)
   for (i in 1:500) {
-    MIXTE_curve[[i]] = MIXTE_function(r, L, Z.b, d = d, alpha = alphas[i], beta = betas[i])
+    MIXTE_curve[[i]] = MIXTE_function(r, L, d = d, alpha = alphas[i], beta = betas[i])
   }
   info = vector(length = 0)
   for (i in 1:500) {
@@ -242,46 +242,91 @@ CI_function_MIXTE = function(d, r, interval = 0.95, L, Z.beta, alphas = alpha0_M
 
 ##2-ion Mix, Silicon and Fe600
 ```{r}
-out = MIXTE_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)))
-two_ion_MIXTE1 = data.frame(d = out[, 1], CA = out[, 2])
-two_ion_MIXTE2 = data.frame(d = out[, 1][seq(11,60, by = 5)], CA = out[, 2][seq(11,60, by = 5)])
-d1 =two_ion_MIXTE1$d
-d2 =two_ion_MIXTE2$d
+out = MIXTE_function(r = rep(1/2, times = 2), L = c(100, 175), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)))
+two_ion_MIXTE = data.frame(d = out[, 1], CA = out[, 2])
+
+#two_ion_MIXTE = data.frame(d = out[, 1][seq(11,60, by = 5)], CA = out[, 2][seq(11,60, by = 5)]) I created this smaller sample to make sure my Monte-Carlo function works. Now that it does, I will use the full data. The full d includes d = 0 which gives errors in calculating the CI, so I took it out.)
+
+d =(two_ion_MIXTE$d)[-1]
 ```
 
 ```{r}
-v2 <- data.frame(lower = vector(length = length(d2)),upper = vector(length = length(d2)))
+bounds <- data.frame(lower = vector(length = length(d)),upper = vector(length = length(d)))
 #Then the 95% CI multivariate MC simulated ribbon
 ninty_five_CI_lower = vector(length = 0)
 ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
-for (i in 1:length(d2)) {
-  a = CI_function_MIXTE(d = c(0, d2[i]), r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
-  v2$lower[i-1] = a[1]
-  v2$upper[i-1] = a[2]
-  print(a)
+for (i in 1:length(d)) {
+  a = CI_function_MIXTE(d = c(0, d[i]), r = rep(1/2, times = 2),  L = c(100, 175))
+  bounds$lower[i-1] = a[1]
+  bounds$upper[i-1] = a[2]
   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
   ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
 }
-two_ion_MIXTE2$CI_lower = c(ninty_five_CI_lower)
-two_ion_MIXTE2$CI_upper = c(ninty_five_CI_upper)
+two_ion_MIXTE$CI_lower = c(0, ninty_five_CI_lower) #Forcing d = 0 to have no CI (constant)
+two_ion_MIXTE$CI_upper = c(0, ninty_five_CI_upper)
+
+d <- c(0, d) #Adding 0 back
+
 
 #Get the simple effect additivity MIXTE
-two_ion_MIXTE2$simpleeffect = TE_function(d = 0.5*d2, L = 100, alpha = alpha0, beta = beta0) + TE_function(d = 0.5*d2, L = 175, alpha = alpha0, beta = beta0)
+two_ion_MIXTE$simpleeffect = TE_function(d = 0.5*d, L = 100, alpha = alpha0, beta = beta0) + TE_function(d = 0.5*d, L = 175, alpha = alpha0, beta = beta0)
 #Get the individual TE_functionS
-two_ion_MIXTE2$silicon = TE_function(d = d2, L = 100, alpha = alpha0, beta = beta0)
-two_ion_MIXTE2$ironsix = TE_function(d = d2, L = 175, alpha = alpha0, beta = beta0)
+two_ion_MIXTE$silicon = TE_function(d = d, L = 100, alpha = alpha0, beta = beta0)
+two_ion_MIXTE$ironsix = TE_function(d = d, L = 175, alpha = alpha0, beta = beta0)
 
-CA2 <- two_ion_MIXTE2$CA
-simpleeffect2 <- two_ion_MIXTE2$simpleeffect
-silicon2 <- two_ion_MIXTE2$silicon
-ironsix2 <- two_ion_MIXTE2$ironsix
-plot(x = d2 * 100, y = CA2 * 100, type = "l", col = "red")
-lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5) + 
-lines(x = d2 * 100, y = silicon2* 100, col = "green")  
-lines(x = d2 * 100, y = ironsix2* 100, col = "green")
-lines(x= d2*100 , y = two_ion_MIXTE2$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d2*100 , y = two_ion_MIXTE2$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXTE2$CI_lower * 100, rev(two_ion_MIXTE2$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+CA <- two_ion_MIXTE$CA
+simpleeffect <- two_ion_MIXTE$simpleeffect
+silicon <- two_ion_MIXTE$silicon
+ironsix <- two_ion_MIXTE$ironsix
+plot(x = d * 100, y = CA * 100, type = "l", col = "red")
+lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d * 100, y = silicon* 100, col = "green")  
+lines(x = d * 100, y = ironsix* 100, col = "green")
+lines(x= d*100 , y = two_ion_MIXTE$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d*100 , y = two_ion_MIXTE$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d*100,rev(d*100)),c(two_ion_MIXTE$CI_lower * 100, rev(two_ion_MIXTE$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+```
+
+##3-ion Mix, Oxygen, Silicon and Fe600.
+
+```{r}
+out = MIXTE_function(r = rep(1/3, times = 3), L = c(75, 100, 175), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)))
+three_ion_MIXTE = data.frame(d = out[, 1], CA = out[, 2])
+d <- (three_ion_MIXTE$d)[-1] #Taking out 0 to avoid errors in calculating CI's.
+```
+
+```{r}
+bounds <- data.frame(lower = vector(length = length(d)),upper = vector(length = length(d)))
+#Then the 95% CI multivariate MC simulated ribbon
+ninty_five_CI_lower = vector(length = 0)
+ninty_five_CI_upper = vector(length = 0)
+for (i in 1:length(d)) {
+  a = CI_function_MIXTE(d = c(0, d[i]), r = rep(1/3, times = 3),  L = c(75, 100, 175))
+  bounds$lower[i-1] = a[1]
+  bounds$upper[i-1] = a[2]
+  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+}
+three_ion_MIXTE$CI_lower = c(0, ninty_five_CI_lower)
+three_ion_MIXTE$CI_upper = c(0, ninty_five_CI_upper)
+
+d <- c(0, d)
+
+#Get the individual TE_functionS
+three_ion_MIXTE$oxygen = TE_function(d = d, L = 75, alpha = alpha0, beta = beta0)
+three_ion_MIXTE$silicon = TE_function(d = d, L = 100, alpha = alpha0, beta = beta0)
+three_ion_MIXTE$ironsix = TE_function(d = d, L = 175, alpha = alpha0, beta = beta0)
+#Get the simple effect additivity MIXTE
+three_ion_MIXTE$simpleeffect = TE_function(d = d/3, L = 75, alpha = alpha0, beta = beta0) + TE_function(d = d/3, L = 100, alpha = alpha0, beta = beta0) + TE_function(d = d/3, L = 175, alpha = alpha0, beta = beta0)
+  
+
+plot(x = d * 100, y = three_ion_MIXTE$CA * 100, type = "l", col = "red")
+lines(x = d * 100, y = three_ion_MIXTE$simpleeffect * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d * 100, y = three_ion_MIXTE$oxygen* 100, col = "green")  
+lines(x = d * 100, y = three_ion_MIXTE$silicon* 100, col = "green")  
+lines(x = d * 100, y = three_ion_MIXTE$ironsix* 100, col = "green")
+lines(x= d*100 , y = three_ion_MIXTE$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d*100 , y = three_ion_MIXTE$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d*100,rev(d*100)),c(three_ion_MIXTE$CI_lower * 100, rev(three_ion_MIXTE$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
 
