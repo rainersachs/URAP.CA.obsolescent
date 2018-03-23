@@ -206,36 +206,10 @@ lines(dose,SEA(dose),lty=2)
 # lines(x = d_1*100, y = 100 * NTE1_function(d = d_1, L= 75, Z.b = 595), col = "blue", lty = 2)
 # 
 # dev.off()
-sig = vcov(IDER_model)
-monte_carlo_parameters = rmvnorm(n = 500, mean = c(eta0 = eta00, eta1 = eta10, sig0 = sig00, kap = kap0), sigma = sig)
-eta0_MC = monte_carlo_parameters[, 1]
-eta1_MC = monte_carlo_parameters[, 2]
-sig0_MC = monte_carlo_parameters[, 3]
-kap_MC = monte_carlo_parameters[, 4]
-kap_MC[kap_MC <= 1e-6] = 1e-5 
 ```
 
-
-
 ```{r}
-#note because our last parameter were less significant when inputting our variance covariance matrix the parameters had to actually be readjusted to fix for negative value. This is important because if kap parameter went negative our model is nonsensical. (Luckily the fix was only for exactly 15 out of 500 MC samples or only roughly 3%)
-
-#This is a general CI_function where you just get a CI for a specific dose point for any synergy analysis using the monte carlo simulations using vcov().
-CI_function_MIXDER = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
-  MIXDER_curve = list(0)
-  for (i in 1:500) {
-    MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC[i], eta1 = eta1_MC[i], sig0 = sig0_MC[i], kap = kap_MC[i])
-  }
-  info = vector(length = 0)
-  for (i in 1:500) {
-    info = c(info, MIXDER_curve[[i]][, 2][2])
-  }
-  info = sort(info)
-  lower_bound = quantile(info,(1-interval)/2)
-  upper_bound = quantile(info,1-(1-interval)/2)
-  CI = c(lower_bound, upper_bound)
-  return(CI)
-}
+#The following code includes the Monte Carlo CI1 and 2. Monte Carlo CI will use the variance covariance matrix. Monte Carlo CI2 will not hence it will give a boarder interval.
 
 #Monte Carlo using the error bars from summary()
 NN <- 1000
@@ -244,9 +218,9 @@ eta1_MC_2 = rnorm(NN, mean = eta10, sd = 1.617e-04)
 sig0_MC_2 = rnorm(NN, mean = sig00, sd = 1.966e+00)
 kap_MC_2 = rnorm(NN, mean = kap0, sd = 2.628e+02)
 kap_MC_2[kap_MC_2 <= 1e-6] = 1e-5 
-```
 
-```{r}
+# You will get broader CI by running CI_function_MIXDER_MC_2.
+
 MM = 500
 CI_function_MIXDER_MC_2 = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
   MIXDER_curve = list(0)
@@ -263,6 +237,48 @@ CI_function_MIXDER_MC_2 = function(d, d_interested, r, interval = 0.95, L, Z.bet
   CI = c(lower_bound, upper_bound)
   return(CI)
 }
+```
+
+```{r}
+#note because our last parameter were less significant when inputting our variance covariance matrix the parameters had to actually be readjusted to fix for negative value. This is important because if kap parameter went negative our model is nonsensical. (Luckily the fix was only for exactly 15 out of 500 MC samples or only roughly 3%)
+
+#This is a general CI_function where you just get a CI for a specific dose point for any synergy analysis using the monte carlo simulations using vcov().
+CI_function_MIXDER = function(d, r, interval = 0.95, L, Z.beta) {
+  MIXDER_curve = list(0)
+  for (i in 1:500) {
+    MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC[i], eta1 = eta1_MC[i], sig0 = sig0_MC[i], kap = kap_MC[i])
+  }
+  info = vector(length = 0)
+  for (i in 1:500) {
+    info = c(info, MIXDER_curve[[i]][, 2][2])
+  }
+  info = sort(info)
+  lower_bound = quantile(info,(1-interval)/2)
+  upper_bound = quantile(info,1-(1-interval)/2)
+  CI = c(lower_bound, upper_bound)
+  return(CI)
+}
+
+# We don't actually need the above CI_Function_MIXDER 
+```
+
+```{r}
+# Sample parameters from their distributions.
+set.seed(19970101)
+sig = vcov(IDER_model)
+monte_carlo_parameters = rmvnorm(n = 500, mean = c(eta0 = eta00, eta1 = eta10, sig0 = sig00, kap = kap0), sigma = sig)
+eta0_MC = monte_carlo_parameters[, 1]
+eta1_MC = monte_carlo_parameters[, 2]
+sig0_MC = monte_carlo_parameters[, 3]
+kap_MC = monte_carlo_parameters[, 4]
+kap_MC[kap_MC <= 1e-6] = 1e-5 
+```
+
+
+
+
+```{r}
+#MIXDER of iron 2.
 out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)),eta0 = eta00, eta1 = eta10, sig0 = sig00, kap = kap0)
 two_ion_MIXDER1 = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
 two_ion_MIXDER2 = data.frame(d = out[, 1][seq(1,60, by = 5)], CA = out[, 2][seq(1,60, by = 5)] + 0.00071)
@@ -270,23 +286,25 @@ d1 =two_ion_MIXDER1$d
 d2 =two_ion_MIXDER2$d
 ```
 
-```{r}
-v1 <- data.frame(lower = vector(length = length(d1) ),upper = vector(length = length(d1) ))
-#Then the 95% CI multivariate MC simulated ribbon
-ninty_five_CI_lower = vector(length = 0)
-ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
-for (i in 1:length(d1)) {
-  a = CI_function_MIXDER_MC_2(d = c(0, two_ion_MIXDER1$d[i]), d_interested = two_ion_MIXDER1$d[i], r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
-  v1$lower[i] = a[1]
-  v1$upper[i] = a[2]
-  print(a)
-  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
-}
-two_ion_MIXDER1$CI_lower = ninty_five_CI_lower + 0.00071
-two_ion_MIXDER1$CI_upper = ninty_five_CI_upper + 0.00071
 
+```{r}
+# Monte Carlo of using 60 doses for two_ion. 
+ninty_five_CI_lower = vector(length = length(d1))
+ninty_five_CI_upper = vector(length = length(d1))
+for (i in 1:length(d1)){
+  info = vector(length = 0)
+  for (j in 1:500){
+    info = c(info, MIXDER_function(r = rep(1/2, times = 2), c(0,   two_ion_MIXDER1$d[i]),L=c(100, 175), Z.b = c(690, 1075), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+  }
+  info = sort(info)
+  ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
+  ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+}
+two_ion_MIXDER1$CI_lower = ninty_five_CI_lower
+two_ion_MIXDER1$CI_upper = ninty_five_CI_upper
+```
+
+```{r}
 #Get the simple effect additivity MIXDER
 two_ion_MIXDER1$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071
 #Get the individual IDERS
@@ -307,37 +325,28 @@ lines(x= d1*100 , y = two_ion_MIXDER1$CI_upper * 100, lty = 'dashed', col = 'red
 lines(x= d1*100 , y = two_ion_MIXDER1$CI_lower * 100, lty = 'dashed', col = 'red')
 polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER1$CI_lower * 100, rev(two_ion_MIXDER1$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
-```{r}
-v1
-```
-```{r}
-v1$lower[seq(5,61, by = 5)] - v2$lower
-v1$upper[seq(5,61,by = 5)] - v2$upper
 
-```
+
+
 
 ```{r}
-two_ion_MIXDER2
-```
-
-```{r}
-v2 <- data.frame(lower = vector(length = length(d2)),upper = vector(length = length(d2)))
-
-#Then the 95% CI multivariate MC simulated ribbon
-ninty_five_CI_lower = vector(length = 0)
-ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
-for (i in 1:length(d2)) {
-  a = CI_function_MIXDER_MC_2(d = c(0, two_ion_MIXDER2$d[i]), d_interested = two_ion_MIXDER2$d[i], r = rep(1/2, times = 2),  L = c(100, 175), Z.b = c(690, 1075))
-  v2$lower[i] = a[1]
-  v2$upper[i] = a[2]
-  print(a)
-  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+#Then the 95% CI multivariate MC simulated ribbon for 13 doses for 2 ion.
+ninty_five_CI_lower = vector(length = length(d2))
+ninty_five_CI_upper = vector(length = length(d2))
+for (i in 1:length(d2)){
+  info = vector(length = 0)
+  for (j in 1:500){
+    info = c(info, MIXDER_function(r = rep(1/2, times = 2), c(0,   two_ion_MIXDER2$d[i]),L=c(100, 175), Z.b = c(690, 1075), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+  }
+  info = sort(info)
+  ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
+  ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
 }
-two_ion_MIXDER2$CI_lower = ninty_five_CI_lower + 0.00071
-two_ion_MIXDER2$CI_upper = ninty_five_CI_upper + 0.00071
+two_ion_MIXDER2$CI_lower = ninty_five_CI_lower
+two_ion_MIXDER2$CI_upper = ninty_five_CI_upper
+```
 
+```{r}
 #Get the simple effect additivity MIXDER
 two_ion_MIXDER2$simpleeffect = IDER(d = 0.5*d2, L = 100, Z.b = 690) + IDER(d = 0.5*d2, L = 175, Z.b = 1075) + 0.00071
 #Get the individual IDERS
@@ -359,15 +368,9 @@ lines(x= d2*100 , y = two_ion_MIXDER2$CI_lower * 100, lty = 'dashed', col = 'red
 polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER2$CI_lower * 100, rev(two_ion_MIXDER2$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
 
-```{r}
-two_ion_MIXDER2$CI_lower
-CA1
-two_ion_MIXDER2$CI_upper
-```
 
-```{r}
-v2
-```
+
+
 ```{r}
 #This is for the six_ion synergy analysis incorporating our monte carlo simulations with the yellow ribbon as the 95% confidence interval using our monte carlo simulated parameters with two panels for two methods of the MC simulation. Similarly, blues curves are individual IDERs and red curve the mixed IDER and the black the simple effect addtivity curve.
 
@@ -376,25 +379,22 @@ out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240
 six_ion_MIXDER3 = data.frame(d = out[, 1][seq(1,51, by = 5)], CA = out[, 2][seq(1,51, by = 5)] + 0.00071)
 d3 = six_ion_MIXDER3$d
 ```
+
 ```{r}
-#Then the 95% CI multivariate MC simulated ribbon
-v3 <- data.frame(lower = vector(length = length(d3) - 1),upper = vector(length = length(d3) - 1))
-ninty_five_CI_lower = vector(length = 0)
-ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
-for (i in 2:length(d3)) {
-  a = CI_function_MIXDER(d = c(0, six_ion_MIXDER3$d[i]), d_interested = six_ion_MIXDER3$d[i], r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585))
-  v3$lower[i-1] = a[1]
-  v3$upper[i-1] = a[2]
-  print(a)
-  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+#Then the 95% CI multivariate MC simulated ribbon for 11 doses.
+ninty_five_CI_lower = vector(length = length(d3))
+ninty_five_CI_upper = vector(length = length(d3))
+for (i in 1:length(d3)){
+  info = vector(length = 0)
+  for (j in 1:500){
+    info = c(info, MIXDER_function(r = rep(1/6, times = 6), c(0,  six_ion_MIXDER3$d[i]),L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+  }
+  info = sort(info)
+  ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
+  ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
 }
-six_ion_MIXDER3$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
-six_ion_MIXDER3$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
-```
-```{r}
-v3
+six_ion_MIXDER3$CI_lower = ninty_five_CI_lower
+six_ion_MIXDER3$CI_upper = ninty_five_CI_upper
 ```
 ```{r}
 #Get the simple effect additivity MIXDER 
@@ -407,7 +407,7 @@ six_ion_MIXDER3$titanium = IDER(d = d3, L = 125, Z.b = 770) + 0.00071
 six_ion_MIXDER3$ironsix = IDER(d = d3, L = 175, Z.b = 1075) + 0.00071
 six_ion_MIXDER3$ironfour = IDER(d = d3, L = 195, Z.b = 1245) + 0.00071
 six_ion_MIXDER3$ironthree = IDER(d = d3, L = 240, Z.b = 1585) + 0.00071
-save(six_ion_MIXDER, file = "six_ion_95%.Rda")
+
 d2 <- six_ion_MIXDER3$d
 CA2 <- six_ion_MIXDER3$CA
 simpleeffect2 <- six_ion_MIXDER3$simpleeffect
@@ -425,9 +425,9 @@ lines(x = d2 * 100, y = ironthree2* 100, col = "green")
 lines(x = d2 * 100, y = ironfour2* 100, col = "green")
 lines(x = d2 * 100, y = ironsix2* 100, col = "green")  
 lines(x = d2 * 100, y = oxygen2* 100, col = "green")
-lines(x= d2*100 , y = six_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d2*100 , y = six_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d2*100,rev(d2*100)),c(six_ion_MIXDER$CI_lower * 100, rev(six_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+lines(x= d2*100 , y = six_ion_MIXDER3$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d2*100 , y = six_ion_MIXDER3$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d2*100,rev(d2*100)),c(six_ion_MIXDER3$CI_lower * 100, rev(six_ion_MIXDER3$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
 
 ```{r}
@@ -492,8 +492,6 @@ lines(x= d2*100 , y = six_ion_MIXDER$CI_upper_two * 100, lty = 'dashed', col = '
 lines(x= d2*100 , y = six_ion_MIXDER$CI_lower_two * 100, lty = 'dashed', col = 'red')
 polygon(c(d2*100,rev(d2*100)),c(six_ion_MIXDER$CI_lower_two * 100, rev(six_ion_MIXDER$CI_upper_two * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
-
-
 
 
 
