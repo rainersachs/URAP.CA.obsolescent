@@ -219,8 +219,6 @@ sig0_MC_2 = rnorm(NN, mean = sig00, sd = 1.966e+00)
 kap_MC_2 = rnorm(NN, mean = kap0, sd = 2.628e+02)
 kap_MC_2[kap_MC_2 <= 1e-6] = 1e-5 
 
-# You will get broader CI by running CI_function_MIXDER_MC_2.
-
 MM = 500
 CI_function_MIXDER_MC_2 = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
   MIXDER_curve = list(0)
@@ -346,6 +344,7 @@ two_ion_MIXDER2$CI_lower = ninty_five_CI_lower
 two_ion_MIXDER2$CI_upper = ninty_five_CI_upper
 ```
 
+
 ```{r}
 #Get the simple effect additivity MIXDER
 two_ion_MIXDER2$simpleeffect = IDER(d = 0.5*d2, L = 100, Z.b = 690) + IDER(d = 0.5*d2, L = 175, Z.b = 1075) + 0.00071
@@ -368,6 +367,42 @@ lines(x= d2*100 , y = two_ion_MIXDER2$CI_lower * 100, lty = 'dashed', col = 'red
 polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER2$CI_lower * 100, rev(two_ion_MIXDER2$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
 
+```{r}
+# Confidence Interval for two-ion without variance and covariance matrix.
+ninty_five_CI_lower = vector(length = 0)
+ninty_five_CI_upper = vector(length = 0)
+a = vector(length = 0)
+for (i in 2:length(d2)) {
+  a = CI_function_MIXDER_MC_2(d = c(0, two_ion_MIXDER2$d[i]), r = rep(1/2, times = 2), L=c(100, 175), Z.b = c(690, 1075))
+  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+}
+two_ion_MIXDER2$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
+two_ion_MIXDER2$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
+
+#Get the simple effect additivity MIXDER
+two_ion_MIXDER2$simpleeffect = IDER(d = 0.5*d2, L = 100, Z.b = 690) + IDER(d = 0.5*d2, L = 175, Z.b = 1075) + 0.00071
+#Get the individual IDERS
+two_ion_MIXDER2$silicon = IDER(d = d2, L = 100, Z.b = 690) + 0.00071
+two_ion_MIXDER2$ironsix = IDER(d = d2, L = 175, Z.b = 1075) + 0.00071
+save(two_ion_MIXDER2, file = "two_ion_95%.Rda")
+
+d2 <- two_ion_MIXDER2$d
+CA1 <- two_ion_MIXDER2$CA
+simpleeffect1 <- two_ion_MIXDER2$simpleeffect
+silicon1 <- two_ion_MIXDER2$silicon
+ironsix1 <- two_ion_MIXDER2$ironsix
+plot(x = d2 * 100, y = CA1 * 100, type = "l", col = "red")
+lines(x = d2 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d2 * 100, y = silicon1* 100, col = "green")  
+lines(x = d2 * 100, y = ironsix1* 100, col = "green")
+lines(x= d2*100 , y = two_ion_MIXDER2$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d2*100 , y = two_ion_MIXDER2$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER2$CI_lower * 100, rev(two_ion_MIXDER2$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+
+
+
+```
 
 
 
