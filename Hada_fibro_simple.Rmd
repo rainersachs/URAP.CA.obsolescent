@@ -308,7 +308,6 @@ two_ion_MIXDER1$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0
 #Get the individual IDERS
 two_ion_MIXDER1$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
 two_ion_MIXDER1$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
-save(two_ion_MIXDER1, file = "two_ion_95%.Rda")
 
 d1 <- two_ion_MIXDER1$d
 CA1 <- two_ion_MIXDER1$CA
@@ -316,7 +315,7 @@ simpleeffect1 <- two_ion_MIXDER1$simpleeffect
 silicon1 <- two_ion_MIXDER1$silicon
 ironsix1 <- two_ion_MIXDER1$ironsix
 plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red")
-lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
 lines(x = d1 * 100, y = silicon1* 100, col = "green")  
 lines(x = d1 * 100, y = ironsix1* 100, col = "green")
 lines(x= d1*100 , y = two_ion_MIXDER1$CI_upper * 100, lty = 'dashed', col = 'red')
@@ -359,7 +358,7 @@ simpleeffect1 <- two_ion_MIXDER2$simpleeffect
 silicon1 <- two_ion_MIXDER2$silicon
 ironsix1 <- two_ion_MIXDER2$ironsix
 plot(x = d2 * 100, y = CA1 * 100, type = "l", col = "red")
-lines(x = d2 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d2 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
 lines(x = d2 * 100, y = silicon1* 100, col = "green")  
 lines(x = d2 * 100, y = ironsix1* 100, col = "green")
 lines(x= d2*100 , y = two_ion_MIXDER2$CI_upper * 100, lty = 'dashed', col = 'red')
@@ -385,7 +384,6 @@ two_ion_MIXDER2$simpleeffect = IDER(d = 0.5*d2, L = 100, Z.b = 690) + IDER(d = 0
 #Get the individual IDERS
 two_ion_MIXDER2$silicon = IDER(d = d2, L = 100, Z.b = 690) + 0.00071
 two_ion_MIXDER2$ironsix = IDER(d = d2, L = 175, Z.b = 1075) + 0.00071
-save(two_ion_MIXDER2, file = "two_ion_95%.Rda")
 
 d2 <- two_ion_MIXDER2$d
 CA1 <- two_ion_MIXDER2$CA
@@ -393,7 +391,7 @@ simpleeffect1 <- two_ion_MIXDER2$simpleeffect
 silicon1 <- two_ion_MIXDER2$silicon
 ironsix1 <- two_ion_MIXDER2$ironsix
 plot(x = d2 * 100, y = CA1 * 100, type = "l", col = "red")
-lines(x = d2 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d2 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
 lines(x = d2 * 100, y = silicon1* 100, col = "green")  
 lines(x = d2 * 100, y = ironsix1* 100, col = "green")
 lines(x= d2*100 , y = two_ion_MIXDER2$CI_upper * 100, lty = 'dashed', col = 'red')
@@ -410,9 +408,13 @@ polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER2$CI_lower * 100, rev(two_ion_MIXD
 #This is for the six_ion synergy analysis incorporating our monte carlo simulations with the yellow ribbon as the 95% confidence interval using our monte carlo simulated parameters with two panels for two methods of the MC simulation. Similarly, blues curves are individual IDERs and red curve the mixed IDER and the black the simple effect addtivity curve.
 
 #First the MIXDER of the true curve 
-out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), d = c(seq(0, 0.01, 0.001), seq(0.01, 0.4, by = 0.01)))
+out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.4, by = 0.01)))
 six_ion_MIXDER3 = data.frame(d = out[, 1][seq(1,51, by = 5)], CA = out[, 2][seq(1,51, by = 5)] + 0.00071)
 d3 = six_ion_MIXDER3$d
+
+#six_ion_MIXDER3 = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)  #This is the full 50 dose version.
+#d3 = six_ion_MIXDER3$d
+
 ```
 
 ```{r}
@@ -453,7 +455,7 @@ ironfour2 <- six_ion_MIXDER3$ironfour
 ironsix2 <- six_ion_MIXDER3$ironsix
 oxygen2 <- six_ion_MIXDER3$oxygen
 plot(x = d2 * 100, y = CA2 * 100, type = "l", col = "red")
-lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5) + 
+lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5)
 lines(x = d2 * 100, y = silicon2* 100, col = "green")  
 lines(x = d2 * 100, y = titanium2* 100, col = "green")
 lines(x = d2 * 100, y = ironthree2* 100, col = "green")  
