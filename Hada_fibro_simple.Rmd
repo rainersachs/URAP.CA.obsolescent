@@ -8,7 +8,7 @@
 ```{r}
 library(deSolve) # package for solving differential equations
 library(minpack.lm) # package for non-linear regression #rks to laz: I think we probably can just use nls() in stats, not nlsLM from linpack. Please check in R documentation if there is any functional difference at all
-library(mvtnorm) # package for calculating confidence intervals by Monte Carlo simulation based on variance-covariance matrices #rks to laz: I added to comment.Please check that my addition is OK.
+library(mvtnorm) # package for calculating confidence intervals by Monte Carlo simulation based on variance-covariance matrices #rks to laz: I added to comment.Please check that my addition is OK.
 rm(list=ls())
 ```
 
@@ -210,6 +210,7 @@ lines(dose,SEA(dose),lty=2)
 
 ```{r}
 #The following code includes the Monte Carlo CI1 and 2. Monte Carlo CI will use the variance covariance matrix. Monte Carlo CI2 will not hence it will give a boarder interval.
+set.seed(19970101)
 
 #Monte Carlo using the error bars from summary()
 NN <- 1000
@@ -262,7 +263,6 @@ CI_function_MIXDER = function(d, r, interval = 0.95, L, Z.beta) {
 
 ```{r}
 # Sample parameters from their distributions.
-set.seed(19970101)
 sig = vcov(IDER_model)
 monte_carlo_parameters = rmvnorm(n = 500, mean = c(eta0 = eta00, eta1 = eta10, sig0 = sig00, kap = kap0), sigma = sig)
 eta0_MC = monte_carlo_parameters[, 1]
@@ -530,5 +530,46 @@ lines(x= d2*100 , y = six_ion_MIXDER$CI_lower_two * 100, lty = 'dashed', col = '
 polygon(c(d2*100,rev(d2*100)),c(six_ion_MIXDER$CI_lower_two * 100, rev(six_ion_MIXDER$CI_upper_two * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 ```
 
+```{r}
+#6-ion No Covariance 10 dose
+CI_function_MIXDER_MC_2 = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
+  MIXDER_curve = list(0)
+  for (i in 1:MM) {
+    MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_2[i], eta1 = eta1_MC_2[i], sig0 = sig0_MC_2[i], kap = kap_MC_2[i])
+  }
+  info = vector(length = 0)
+  for (i in 1:MM) {
+    info = c(info, MIXDER_curve[[i]][, 2][2])
+  }
+  info = sort(info)
+  lower_bound = info[(1-interval)/2*500]
+  upper_bound = info[(interval + (1-interval)/2)*500]
+  CI = c(lower_bound, upper_bound)
+  return(CI)
+}
+six_ion_MIXDER4 = data.frame(d = out[, 1][seq(1,50, by = 5)], CA = out[, 2][seq(1,50, by = 5)] + 0.00071)
+d4 = six_ion_MIXDER4$d
+ninty_five_CI_lower = vector(length = 0)
+ninty_five_CI_upper = vector(length = 0)
+a = vector(length = 0)
+for (i in 2:length(d4)) {
+  a = CI_function_MIXDER_MC_2(d = c(0, six_ion_MIXDER4$d[i]), r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585))
+  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+}
+six_ion_MIXDER4$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
+six_ion_MIXDER4$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
+
+#Get the simple effect additivity MIXDER 
+six_ion_MIXDER4$simpleeffect = IDER(d = 1/6*d4, L = 125, Z.b = 770) + IDER(d = 1/6*d4, L = 175, Z.b = 1075) + IDER(d = 1/6*d4, L = 75, Z.b = 595) + IDER(d = 1/6*d4, L = 100, Z.b = 690) + IDER(d = 1/6*d4, L = 195, Z.b = 1245) + IDER(d = 1/6*d4, L = 240, Z.b = 1585) + 0.00071
+
+#Get the individual IDERS
+six_ion_MIXDER4$oxygen = IDER(d = d4, L = 75, Z.b = 595) + 0.00071
+six_ion_MIXDER4$silicon = IDER(d = d4, L = 100, Z.b = 690) + 0.00071
+six_ion_MIXDER4$titanium = IDER(d = d4, L = 125, Z.b = 770) + 0.00071
+six_ion_MIXDER4$ironsix = IDER(d = d4, L = 175, Z.b = 1075) + 0.00071
+six_ion_MIXDER4$ironfour = IDER(d = d4, L = 195, Z.b = 1245) + 0.00071
+six_ion_MIXDER4$ironthree = IDER(d = d4, L = 240, Z.b = 1585) + 0.00071
+```
 
 
