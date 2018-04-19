@@ -49,20 +49,19 @@ lines(x= d2*100 , y = two_ion_MIXDER_small$CI_lower * 100, lty = 'dashed', col =
 polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER_small$CI_lower * 100, rev(two_ion_MIXDER_small$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 
 
-
-####2-ion 12 dose without covariances (larger CI's)
+####2-ion 60 dose without covariances (larger CI's)
 #Assuming the working directory is the location of this R file (On Github the csv file is in the same location as this R file)
-two_ion_MIXDER_small_var <- read.csv("2ionMonteCarlovar.csv")
+two_ion_MIXDER_var <- read.csv("2ionMonteCarlovar.csv")
 
 #The graphing part
-plot(x = d2 * 100, y = CA2 * 100, type = "l", col = "red", main="2-ion Model", sub="12 Doses without Covariances", 
+plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red", main="2-ion Model", sub="60 Doses without Covariances", 
      xlab="Dose * 100", ylab="CA * 100")
-lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d2 * 100, y = silicon2* 100, col = "green")  
-lines(x = d2 * 100, y = ironsix2* 100, col = "green")
-lines(x= d2*100 , y = two_ion_MIXDER_small_var$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d2*100 , y = two_ion_MIXDER_small_var$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER_small_var$CI_lower * 100, rev(two_ion_MIXDER_small_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
+lines(x = d1 * 100, y = silicon1* 100, col = "green")  
+lines(x = d1 * 100, y = ironsix1* 100, col = "green")
+lines(x= d1*100 , y = two_ion_MIXDER_var$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d1*100 , y = two_ion_MIXDER_var$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER_var$CI_lower * 100, rev(two_ion_MIXDER_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 
 
 ####6-ion 50 dose
@@ -119,20 +118,20 @@ lines(x= d22*100 , y = six_ion_MIXDER_small$CI_upper * 100, lty = 'dashed', col 
 lines(x= d22*100 , y = six_ion_MIXDER_small$CI_lower * 100, lty = 'dashed', col = 'red')
 polygon(c(d22*100,rev(d22*100)),c(six_ion_MIXDER_small$CI_lower * 100, rev(six_ion_MIXDER_small$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 
-####6-ion 10 dose without covariances (larger Ci's)
-six_ion_MIXDER_small_var <- read.csv("6ionMonteCarlovar.csv")
+####6-ion 50 dose without covariances (larger Ci's)
+six_ion_MIXDER_var <- read.csv("6ionMonteCarlovar.csv")
 
 #the graphing part
-d22 <- six_ion_MIXDER_small_var$d
-CA22 <- six_ion_MIXDER_small_var$CA
-simpleeffect22 <- six_ion_MIXDER_small_var$simpleeffect
-silicon22 <- six_ion_MIXDER_small_var$silicon
-titanium22 <- six_ion_MIXDER_small_var$titanium
-ironthree22 <- six_ion_MIXDER_small_var$ironthree
-ironfour22 <- six_ion_MIXDER_small_var$ironfour
-ironsix22 <- six_ion_MIXDER_small_var$ironsix
-oxygen22 <- six_ion_MIXDER_small_var$oxygen
-plot(x = d22 * 100, y = CA22 * 100, type = "l", col = "red", main="6-ion Model", sub="10 Doses without Covariances", 
+d22 <- six_ion_MIXDER_var$d
+CA22 <- six_ion_MIXDER_var$CA
+simpleeffect22 <- six_ion_MIXDER_var$simpleeffect
+silicon22 <- six_ion_MIXDER_var$silicon
+titanium22 <- six_ion_MIXDER_var$titanium
+ironthree22 <- six_ion_MIXDER_var$ironthree
+ironfour22 <- six_ion_MIXDER_var$ironfour
+ironsix22 <- six_ion_MIXDER_var$ironsix
+oxygen22 <- six_ion_MIXDER_var$oxygen
+plot(x = d22 * 100, y = CA22 * 100, type = "l", col = "red", main="6-ion Model", sub="50 Doses without Covariances", 
      xlab="Dose * 100", ylab="CA * 100")
 lines(x = d22 * 100, y = simpleeffect22 * 100, col = "black", lty = 2, lwd = 0.5)
 lines(x = d22 * 100, y = silicon22* 100, col = "green")  
@@ -141,6 +140,6 @@ lines(x = d22 * 100, y = ironthree22* 100, col = "green")
 lines(x = d22 * 100, y = ironfour22* 100, col = "green")
 lines(x = d22 * 100, y = ironsix22* 100, col = "green")  
 lines(x = d22 * 100, y = oxygen22* 100, col = "green")
-lines(x= d22*100 , y = six_ion_MIXDER_small_var$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d22*100 , y = six_ion_MIXDER_small_var$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d22*100,rev(d22*100)),c(six_ion_MIXDER_small_var$CI_lower * 100, rev(six_ion_MIXDER_small_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+lines(x= d22*100 , y = six_ion_MIXDER_var$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d22*100 , y = six_ion_MIXDER_var$CI_lower * 100, lty = 'dashed', col = 'red')
+polygon(c(d22*100,rev(d22*100)),c(six_ion_MIXDER_var$CI_lower * 100, rev(six_ion_MIXDER_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
