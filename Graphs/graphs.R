@@ -25,31 +25,7 @@ lines(x= d1*100 , y = two_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red'
 lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
 polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 
-
-
-
-
-####2-ion 12 dose
-d_2ion_small = d[seq(1,60, by = 5)]
-two_ion_MIXDER_small <- two_ion_MIXDER[seq(1,60, by = 5), ]
-
-#The graphing part
-d2 <- two_ion_MIXDER_small$d
-CA2 <- two_ion_MIXDER_small$CA
-simpleeffect2 <- two_ion_MIXDER_small$simpleeffect
-silicon2 <- two_ion_MIXDER_small$silicon
-ironsix2 <- two_ion_MIXDER_small$ironsix
-plot(x = d2 * 100, y = CA2 * 100, type = "l", col = "red", main="2-ion Model", sub="12 Doses", 
-     xlab="Dose * 100", ylab="CA * 100")
-lines(x = d2 * 100, y = simpleeffect2 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d2 * 100, y = silicon2* 100, col = "green")  
-lines(x = d2 * 100, y = ironsix2* 100, col = "green")
-lines(x= d2*100 , y = two_ion_MIXDER_small$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d2*100 , y = two_ion_MIXDER_small$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d2*100,rev(d2*100)),c(two_ion_MIXDER_small$CI_lower * 100, rev(two_ion_MIXDER_small$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-
-
-####2-ion 60 dose without covariances (larger CI's)
+###2-ion 60 dose without covariances (larger CI's)
 #Assuming the working directory is the location of this R file (On Github the csv file is in the same location as this R file)
 two_ion_MIXDER_var <- read.csv("2ionMonteCarlovar.csv")
 
