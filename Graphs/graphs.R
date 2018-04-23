@@ -16,14 +16,17 @@ CA1 <- two_ion_MIXDER$CA
 simpleeffect1 <- two_ion_MIXDER$simpleeffect
 silicon1 <- two_ion_MIXDER$silicon
 ironsix1 <- two_ion_MIXDER$ironsix
-plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red", main="2-ion Model", sub="Full 60 Doses", 
-     xlab="Dose * 100", ylab="CA * 100")
-lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d1 * 100, y = silicon1* 100, col = "green")  
-lines(x = d1 * 100, y = ironsix1* 100, col = "green")
-lines(x= d1*100 , y = two_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+plot(c(0,50),c(0,8),xlim=c(0,50),ylim=c(0,10),pch=0, col='white') # RKS to PSW. This allows a really intense ribbon which gets overwritten by the curves. I was not able to get the same effect with opacities.
+legend(x = "topleft", legend = "Fe at 600 MeV/u and Si. The upper curve is Fe Proportions =c(40,60)", cex = .3, inset = 0.025) # RKS to PSW. Please don't annotate. Use tiny legends with detailed information instead Are the proportions actually 40%-60% or did I remember wrong? Is Fe the upper or lower curve?
+polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)), col = rgb(1, 1, 0, 1),
+        border = 'orange') # RKS to PSW. Yellow is the best color for ribbons. (it is terrible for lines)
+# main="2-ion Model" etc. not needed, using small legend instead
+#lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5) # RKS to PSW. Monte Carlo ribbon plots will never include simple effect additivity curves 
+lines(x = d1 * 100, y = silicon1* 100, col = "green", lwd=2)  
+lines(x = d1 * 100, y = ironsix1* 100, col = "green", lwd=2)
+#lines(x= d1*100 , y = two_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+#lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+lines(x = d1 * 100, y = CA1 * 100, type = "l", lwd=2, col = "red") # RKS to PSW. This way the incremental effect additivity curve, which should almost always be solid red and which we always want to emphasize, overwrites all the other curves.
 
 ###2-ion 60 dose without covariances (larger CI's)
 #Assuming the working directory is the location of this R file (On Github the csv file is in the same location as this R file)
