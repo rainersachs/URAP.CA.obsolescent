@@ -17,7 +17,7 @@ rm(list=ls())
 ```{r}
 #Create dataframes that store the fibroblast WGE simple CA data used in 16Cacao 
 
-Oxygen = data.frame(d = c(0, .0125, .02, .025, .05, .075, .1, .2, .4),CA = c(.24, 1.66, 2.43, 2.37, 1.16, 2.85, 2.58, 6.94, 6.91), ion = "O", Z =8, L = 75, Z.b = 795)
+Oxygen = data.frame(d = c(0, .0125, .02, .025, .05, .075, .1, .2, .4),CA = c(.24, 1.66, 2.43, 2.37, 1.16, 2.85, 2.58, 6.94, 6.91), ion = "O", Z =8, L = 75, Z.b = 595)
 # Some GCR components are high-speed Oxygen nuclei that are almost fully ionized. d=dose; CA are per hundred cells.
 
 Si = data.frame(d = c(0, .02, .04, .06, .08, .1, .12, .2, .4, .8, 1.2), CA = c(.11, 1.26, 1.14, 1.58, 1.22, 1.89, 3.47, 4.6, 9.79, 27.01, 38.84), ion = "Si", Z = 14, L = 100, Z.b = 690)
@@ -320,6 +320,9 @@ two_ion_MIXDER$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.
 two_ion_MIXDER$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
 two_ion_MIXDER$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
 
+#output the df
+#write.csv(two_ion_MIXDER, file = "2ionMonteCarlo.csv", row.names = F)
+
 #The graphing part
 d1 <- two_ion_MIXDER$d
 CA1 <- two_ion_MIXDER$CA
@@ -425,6 +428,7 @@ for (i in 1:length(d3)){
 six_ion_MIXDER$CI_lower = ninty_five_CI_lower
 six_ion_MIXDER$CI_upper = ninty_five_CI_upper
 ```
+
 ```{r}
 #Get the simple effect additivity MIXDER 
 six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
@@ -458,6 +462,7 @@ lines(x = d3 * 100, y = oxygen3* 100, col = "green")
 lines(x= d3*100 , y = six_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
 lines(x= d3*100 , y = six_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
 polygon(c(d3*100,rev(d3*100)),c(six_ion_MIXDER$CI_lower * 100, rev(six_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+#write.csv(six_ion_MIXDER, "6ionMonteCarlov.csv", row.names = F)
 ```
 
 ###6-ion 10 doses (For runtime purpose only)
