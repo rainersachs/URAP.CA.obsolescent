@@ -33,7 +33,7 @@ Ti = data.frame(d = c(0,  0.02, .04, .06, .08, .1, .15, .3, .6), CA = c(0, 1.99,
 
 #param = data.frame(ion = c("O", "Si", "Ti", "Fe600", "Fe450", "Fe300"),
                   # Z = c(8, 14, 22, 26, 26, 26), L = c(75, 100, 125, 175, 195, 240), #Z=atomic charge; L=LET
-                  # Z.b = c(595, 690, 770, 1075, 1245, 1585))#Z^2/beta*^2
+                  # Z.b = c(595, 690, 770, 1075, 1245, 1585)) # Z^2/beta*^2 #595 for O is correct RKS 6/26/2018
 
 #putting it in one big data frame. #rks: the data frame incorporates a correction to Fe600 at dose 0.06, near line 34
 big_df = rbind(Oxygen, Si, Ti, Fe600, Fe450, Fe300)
