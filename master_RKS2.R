@@ -198,15 +198,30 @@ out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 107
 two_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
 ninty_five_CI_lower = vector(length = length(d1))
 ninty_five_CI_upper = vector(length = length(d1))
-for (i in 1:length(d1)){
-  info = vector(length = 0)
-  for (j in 1:MM){
-    info = c(info, MIXDER_function(r = rep(1/2, times = 2), c(0, two_ion_MIXDER$d[i]),L=c(100, 175), Z.b = c(690, 1075), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
-  }
-  info = sort(info)
-  ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
-  ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+
+DERs <- list(0)
+# for (i in 1:length(d1)){ # EGH 07.22.18 I strongly believe this is the area of the slowdown; we are calculating 5000 more curves then necessary.
+  # info = vector(length = 0)
+for (j in 1:MM) {
+  DERs[[j]] <- MIXDER_function(r = rep(1/2, times = 2), 
+                                 d = c(0, two_ion_MIXDER$d), L = c(100, 175), 
+                                 Z.b = c(690, 1075), eta0 = eta0_MC[j], 
+                                 eta1 = eta1_MC[j], sig0 = sig0_MC[j], 
+                                 kap = kap_MC[j])[, 1]
+  cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+            toString(MM)), sprintf('\r'))
 }
+for (i in length(d1)) {
+  sample_values <- sort(sapply(DERs, function(x) x[, 2][i]))
+  # Returning resulting CI
+  ninty_five_CI_lower[i] = sample_values[ceiling((1 - 0.95) / 2 * MM)]
+  ninty_five_CI_upper[i] = sample_values[(0.95 + (1 - 0.95) / 2) * MM]
+  # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
+  # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
+}
+
+
+
 two_ion_MIXDER$CI_lower = ninty_five_CI_lower
 two_ion_MIXDER$CI_upper = ninty_five_CI_upper
 two_ion_MIXDER$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071
