@@ -192,6 +192,7 @@ CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta
   return(CI)
 }
 
+start_time <- Sys.time()
 #MIXDER of 2-ion (Silicon and Fe600) with 60 different dosage points and Monte Carlo Ribbon Plot using covariances
 d1 = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01))
 out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = d1, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat)
@@ -199,28 +200,27 @@ two_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
 ninty_five_CI_lower = vector(length = length(d1))
 ninty_five_CI_upper = vector(length = length(d1))
 
-DERs <- list(0)
-# for (i in 1:length(d1)){ # EGH 07.22.18 I strongly believe this is the area of the slowdown; we are calculating 5000 more curves then necessary.
+DERs <- matrix(nrow = MM, ncol = length(d1))
+# for (i in 1:length(d1)){ # EGH 07.22.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
   # info = vector(length = 0)
 for (j in 1:MM) {
-  DERs[[j]] <- MIXDER_function(r = rep(1/2, times = 2), 
-                                 d = c(0, two_ion_MIXDER$d), L = c(100, 175), 
+  DERs[j, ] <- MIXDER_function(r = rep(1/2, times = 2), 
+                                 d = two_ion_MIXDER$d[1:length(d1)], L = c(100, 175), 
                                  Z.b = c(690, 1075), eta0 = eta0_MC[j], 
                                  eta1 = eta1_MC[j], sig0 = sig0_MC[j], 
-                                 kap = kap_MC[j])[, 1]
+                                 kap = kap_MC[j])[, 2]
   cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
             toString(MM)), sprintf('\r'))
 }
-for (i in length(d1)) {
-  sample_values <- sort(sapply(DERs, function(x) x[, 2][i]))
+for (i in 1:length(d1)) {
+  sample_values <- sort(DERs[, i])
   # Returning resulting CI
-  ninty_five_CI_lower[i] = sample_values[ceiling((1 - 0.95) / 2 * MM)]
-  ninty_five_CI_upper[i] = sample_values[(0.95 + (1 - 0.95) / 2) * MM]
+  ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
+  ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
   # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
   # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
 }
-
-
+Sys.time() - start_time
 
 two_ion_MIXDER$CI_lower = ninty_five_CI_lower
 two_ion_MIXDER$CI_upper = ninty_five_CI_upper
