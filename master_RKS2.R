@@ -175,22 +175,37 @@ sig0_MC_var = rnorm(MM, mean = sig0_hat, sd = 1.966e+00)
 kap_MC_var = rnorm(MM, mean = kap_hat, sd = 2.628e+02)
 kap_MC_var[kap_MC_var <= 1e-6] = 1e-5 
 
-#Monte Carlo functions (without and with covariance)
-CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
+# #Monte Carlo functions (without and with covariance)
+# CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
+#   MIXDER_curve = list(0)
+#   for (i in 1:MM) {
+#     MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
+#   }
+#   info = vector(length = 0)
+#   for (i in 1:MM) {
+#     info = c(info, MIXDER_curve[[i]][, 2][2])
+#   }
+#   info = sort(info)
+#   lower_bound = info[(1-interval)/2*MM]
+#   upper_bound = info[(interval + (1-interval)/2)*MM]
+#   CI = c(lower_bound, upper_bound)
+#   return(CI)
+# }
+
+################### # EGH 08.20.18 REFACTORING
+
+# Monte Carlo functions (without and with covariance)
+refactor_CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
   MIXDER_curve = list(0)
   for (i in 1:MM) {
     MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
+    cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
+              toString(MM)), sprintf('\r'))
   }
-  info = vector(length = 0)
-  for (i in 1:MM) {
-    info = c(info, MIXDER_curve[[i]][, 2][2])
-  }
-  info = sort(info)
-  lower_bound = info[(1-interval)/2*MM]
-  upper_bound = info[(interval + (1-interval)/2)*MM]
-  CI = c(lower_bound, upper_bound)
-  return(CI)
+  return(MIXDER_curve)
 }
+
+################### END REFACTORING
 
 start_time <- Sys.time()
 #MIXDER of 2-ion (Silicon and Fe600) with 60 different dosage points and Monte Carlo Ribbon Plot using covariances
@@ -242,16 +257,38 @@ lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red'
 polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
 
 #2-ion 60 doses without using covariances
-two_ion_MIXDER_var = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# two_ion_MIXDER_var = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# ninty_five_CI_lower = vector(length = 0)
+# ninty_five_CI_upper = vector(length = 0)
+# a = vector(length = 0)
+# for (i in 2:length(d1)) {
+#   print(d1[i])
+#   a = CI_function_MIXDER_var(d = c(0, two_ion_MIXDER_var$d[i]), r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075))
+#   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+#   ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+# }
+
+################## 08.20.18 EGH REFACTORING
+start_time <- Sys.time()
+curves <- refactor_CI_function_MIXDER_var(d = d1, r = rep(1/2, times = 2), 
+                                          L = c(100, 175), Z.b = c(690, 1075))
 ninty_five_CI_lower = vector(length = 0)
 ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
 for (i in 2:length(d1)) {
-  print(d1[i])
-  a = CI_function_MIXDER_var(d = c(0, two_ion_MIXDER_var$d[i]), r = rep(1/2, times = 2), L=c(100, 175), Z.b = c(690, 1075))
-  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+  info = vector(length = 0)
+  for (j in 1:MM) {
+    info = c(info, curves[[j]][, 2][i])
+  }
+  info = sort(info)
+  lower = info[(1 - 0.95) / 2 * MM]
+  upper = info[(0.95 + (1 - 0.95) / 2) * MM]
+  ninty_five_CI_lower = c(ninty_five_CI_lower, lower)
+  ninty_five_CI_upper = c(ninty_five_CI_upper, upper)
+  cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
+            toString(length(d1))), sprintf('\r'))
 }
+Sys.time() - start_time
+################## END REFACTORING
 
 two_ion_MIXDER_var$CI_lower = c(0, ninty_five_CI_lower) + 0.00071
 two_ion_MIXDER_var$CI_upper = c(0, ninty_five_CI_upper) + 0.00071
@@ -278,18 +315,51 @@ out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240
 six_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
 ninty_five_CI_lower = vector(length = length(d3))
 ninty_five_CI_upper = vector(length = length(d3))
-for (i in 1:length(d3)){
-  info = vector(length = 0)
-  for (j in 1:MM){
-    info = c(info, MIXDER_function(r = rep(1/6, times = 6), c(0,  six_ion_MIXDER$d[i]),L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
-  }
-  info = sort(info)
-  ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
-  ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+
+# for (i in 1:length(d3)){
+#   info = vector(length = 0)
+#   for (j in 1:MM){
+#     info = c(info, MIXDER_function(r = rep(1/6, times = 6), c(0,  six_ion_MIXDER$d[i]),L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+#   }
+#   info = sort(info)
+#   ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
+#   ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+# }
+# six_ion_MIXDER$CI_lower = ninty_five_CI_lower
+# six_ion_MIXDER$CI_upper = ninty_five_CI_upper
+# six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
+
+######################## 08.20.18 EGH REFACTORING START
+start_time <- Sys.time()
+DERs <- matrix(nrow = MM, ncol = length(d3))
+# for (i in 1:length(d3)){ # EGH 08.20.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
+# info = vector(length = 0)
+for (j in 1:MM) {
+  DERs[j, ] <- MIXDER_function(r = rep(1/6, times = 6), 
+                               d = six_ion_MIXDER$d[1:length(d3)], 
+                               L = c(75, 100, 125, 175, 195, 240), 
+                               Z.b = c(595, 690, 770, 1075, 1245, 1585),
+                               eta0 = eta0_MC[j], eta1 = eta1_MC[j], 
+                               sig0 = sig0_MC[j], kap = kap_MC[j])[, 2]
+  cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+            toString(MM)), sprintf('\r'))
 }
+for (i in 1:length(d3)) {
+  sample_values <- sort(DERs[, i])
+  # Returning resulting CI
+  ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
+  ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
+  # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
+  # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
+}
+start_time <- Sys.time()
+
+################### REFACTORING END
+
 six_ion_MIXDER$CI_lower = ninty_five_CI_lower
 six_ion_MIXDER$CI_upper = ninty_five_CI_upper
 six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
+
 
 #Get the individual IDERS
 six_ion_MIXDER$oxygen = IDER(d = d3, L = 75, Z.b = 595) + 0.00071
@@ -337,10 +407,12 @@ CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta
   CI = c(lower_bound, upper_bound)
   return(CI)
 }
+
 six_ion_MIXDER_var = six_ion_MIXDER
 ninty_five_CI_lower = vector(length = 0)
 ninty_five_CI_upper = vector(length = 0)
 a = vector(length = 0)
+
 for (i in 2:length(d3)) {
   a = CI_function_MIXDER_var(d = c(0, six_ion_MIXDER_var$d[i]), r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585))
   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
