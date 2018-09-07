@@ -1,4 +1,4 @@
-library(deSolve) # package for solving differential equations
+library(deSolve) # package for solving differential equations.
 library(minpack.lm) # package for non-linear regression #rks to laz: I think we probably can just use nls() in stats, not nlsLM from linpack. Please check in R documentation if there is any functional difference at all
 library(mvtnorm) # package for calculating confidence intervals by Monte Carlo simulation based on variance-covariance matrices #rks to laz: I added to comment.Please check that my addition is OK.
 library(Hmisc)
