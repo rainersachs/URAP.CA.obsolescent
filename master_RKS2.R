@@ -98,27 +98,50 @@ information_critera_df #IDER has the lowest score (performs better) in both crit
 
 
 ##MIXDER_function and graphs
-MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat ,kap = kap_hat) {
-  dE=function(yini,State,Pars){
-    eta0 = eta0; eta1 = eta1; sig0 = sig0; kap = kap
-    with(as.list(c(State, Pars)), {
-      P = vector(length = length(L))
-      sig = vector(length = length(L))
-      etaa = vector(length = length(L))
-      u = vector(length = length(L))
-      for (i in 1:length(L)) {
-        P[i] = (1-exp(-Z.b[i]/kap))^2
-        sig[i] = sig0*P[i] + 0.041/6.24*L[i]*(1-P[i])
-        etaa[i] = eta0*L[i]*exp(-eta1*L[i])
-        u[i] = uniroot(function(d) sig[i]*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
-      }
-      dI = vector(length = length(L))
-      for (i in 1:length(L)) {
-        dI[i] = r[i]*(sig[i]*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
-      }
-      dI = sum(dI)
-      return(list(c(dI)))
-    })
+MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat ,kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para") {
+  if (model == "4para"){
+    dE=function(yini,State,Pars){
+      eta0 = eta0; eta1 = eta1; sig0 = sig0; kap = kap
+      with(as.list(c(State, Pars)), {
+        P = vector(length = length(L))
+        sig = vector(length = length(L))
+        etaa = vector(length = length(L))
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          P[i] = (1-exp(-Z.b[i]/kap))^2
+          sig[i] = sig0*P[i] + 0.041/6.24*L[i]*(1-P[i])
+          etaa[i] = eta0*L[i]*exp(-eta1*L[i])
+          u[i] = uniroot(function(d) sig[i]*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sig[i]*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
+  
+  else if (model == "2para"){
+    dE = function(yini, State, Pars){
+      sigm_0 = sigm_0; eta_0 = eta_0
+      with(as.list(c(State, Pars)), {
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          u[i] = uniroot(function(d) sigm_0*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + eta_0*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sigm_0*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + eta_0*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
+  else{
+    stop("Model Not Recognized")
   }
   pars = NULL; yini = c(I= 0); d = d
   out = ode(yini,times = d, dE, pars, method = "radau")
@@ -133,26 +156,40 @@ SEA=function(d){
 
 r=rep(1/6,6);L = c(75, 100, 125, 175, 195, 240); Z.b = c(595, 690, 770, 1075, 1245, 1585); dose=seq(0, 0.4, by=0.001)
 
-MX=MIXDER_function(r, L, Z.b, d=dose) #for this mixture can't go much above 0.6#
+MX=MIXDER_function(r, L, Z.b, d=dose, model = "4para") #for this mixture can't go much above 0.6#
 
-IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat) {
+IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para") {
   #SCW: Added an option for inputting ion names instead of L, Z.b to decrease chance of transcription error and keep track of which ions are being mixed. (Old code should still work for now, but ideally we will change everything to this format in the future)
   #ions is a vector of strings of the names of the ions
   if (is.null(ions)){
-  P = (1-exp(-Z.b/kap_hat))^2
-  sig = sig0*P + 0.041/6.24*L*(1-P)
-  eta = eta0*L*exp(-eta1*L)
-  return(sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+    if (model == "4para"){
+      P = (1-exp(-Z.b/kap_hat))^2
+      sig = sig0*P + 0.041/6.24*L*(1-P)
+      eta = eta0*L*exp(-eta1*L)
+      return(sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+    }
+    if (model == "2para"){
+      return(sigm_0*6.24*d/L*(1-exp(-1024*d/L)) + eta_0*(1-exp(-10^5*d)))
+    }
   }
-  else{#After testing, this results in the same output as the old one besides rounding error that cannot be seen in the available digits
-    r = 1/length(ions)
-    info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise()
-    info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
-    output = 0
+  r = 1/length(ions)
+  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise()
+  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
+  output = 0
+  if (model == "4para"){#After testing, this results in the same output as the old one besides rounding error that cannot be seen in the available digits
     for (i in 1: nrow(info_table)){
-      output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i])
+      output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = "4para")
     }
     return(output)
+  }
+  else if (model == "2para"){
+    for (i in 1: nrow(info_table)){
+      output = output + IDER(d*r, L = info_table$L[i], model = "2para")
+    }
+    return(output)
+  }
+  else {
+    stop("Model Not Recognized")
   }
 }
 #Plotting
@@ -174,7 +211,7 @@ plot(ddose,Parsimonious(ddose,L=75,eta_0_hat,sigm_0_hat),
 #Confidence Intervals (Monte Carlo)
 set.seed(19970101)
 MM <- 500
-#Sample parameters from their distributions with covariances
+#Sample parameters from their distributions with covariances for 4para
 sig = vcov(IDER_model)
 monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat), sigma = sig)
 eta0_MC = monte_carlo_parameters[, 1]
@@ -189,6 +226,99 @@ eta1_MC_var = rnorm(MM, mean = eta1_hat, sd = 1.617e-04)
 sig0_MC_var = rnorm(MM, mean = sig0_hat, sd = 1.966e+00)
 kap_MC_var = rnorm(MM, mean = kap_hat, sd = 2.628e+02)
 kap_MC_var[kap_MC_var <= 1e-6] = 1e-5 
+
+#Sample parameters from their distributions with covariances for 2para
+sig = vcov(Parsimonious_model)
+monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta_0 = eta_0_hat, sigm_0 = sigm_0_hat), sigma = sig)
+eta_0_MC = monte_carlo_parameters[, 1]
+sigm_0_MC =monte_carlo_parameters[, 2] 
+
+#Sample parameters from their distributions without covariances for 2para
+
+eta_0_MC_var = rnorm(MM, mean = eta_0_hat, sd = 0.0004996677)
+sigm_0_MC_var = rnorm(MM, mean = sigm_0_hat, sd = 0.2703911)
+
+
+
+monte_carlo <- function(ions, model = "4para", r = rep(1/length(ions), length(ions)), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, n = 500, graph = T, background = 0.00071, cov = T){
+  ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
+  #r is a vector that sums up to 1
+  #ions is a vector of strings of the names of the ions in the mixture
+  #d is a vector of different dosage
+  #If cov = F plots out the result without using the cov matrix
+  known_ions <- unique(modified_df$ion)
+  if (sum(ions %in% known_ions) != length(ions)){
+    stop("Unknown Ion Input")
+  }
+  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
+  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
+  L = info_table$L
+  Z.b = info_table$Z.b
+  ninty_five_CI_lower = vector(length = length(d))
+  ninty_five_CI_upper = vector(length = length(d))
+  out = MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, eta0 = eta0, eta1=eta1, sig0=sig0, kap = kap, sigm_0 = sigm_0 ,eta_0 = eta_0, model = model)
+  MIXDER = data.frame(d = d, CA = out[, 2] + background)
+  DERs <- matrix(nrow = n, ncol = length(d))
+  if (cov == F){
+    for (j in 1:n) {
+      DERs[j,] <-  MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[j], eta1 = eta1_MC_var[j], sig0 = sig0_MC_var[j], kap = kap_MC_var[j], sigm_0 = sigm_0_MC_var[j] ,eta_0 = eta_0_MC_var[j], model = model)[, 2]
+      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+                toString(n)), sprintf('\r'))
+    }
+  }
+  else{
+    for (j in 1:n) {
+      DERs[j, ] <- MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j], sigm_0 = sigm_0_MC[j] ,eta_0 = eta_0_MC[j], model = model)[, 2]
+      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+                toString(n)), sprintf('\r'))
+    }
+  }
+  for (i in 1:length(d)) {
+    sample_values <- sort(DERs[, i])
+    # Returning resulting CI
+    ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * n)] + background  #Need to add background prevalence of 0.00071 to every output
+    ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * n] + background
+  }
+
+  MIXDER$CI_lower = ninty_five_CI_lower
+  MIXDER$CI_upper = ninty_five_CI_upper
+  MIXDER$simpleeffect = IDER(d, ions = ions, model = model) + length(ions) * background #SCW: I believe we should add background prevalence to every IDER
+  names = colnames(MIXDER)
+  for (k in ions){
+    ider = IDER(d, ions = k, model = model)
+    MIXDER <- cbind(MIXDER, data.frame(ider))
+  }
+  colnames(MIXDER) <- c(names, ions)
+  if(graph == F){
+      return(MIXDER)
+    }
+  else{
+      CA <- MIXDER$CA
+      simpleeffect <- MIXDER$simpleeffect
+      plot(x = d * 100, y = CA * 100, type = "l", col = "red")
+      lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5)
+      for(i in 6:ncol(MIXDER)){
+        lines(x = d * 100, y = 100*as.vector(MIXDER[,i]), col = "green")
+      }
+      lines(x= d*100 , y = MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+      lines(x= d*100 , y = MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+      polygon(c(d*100,rev(d*100)),c(MIXDER$CI_lower * 100, rev(MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+    }
+}
+
+
+monte_carlo(c("Si", "Fe600"))
+monte_carlo(c("Si", "Fe600"), model = "2para")
+
+monte_carlo(c("Si", "Fe600"), cov = F)
+monte_carlo(c("Si", "Fe600"), cov = F, model = "2para")
+
+monte_carlo(c("O", "Si", "Ti", "Fe600", "Fe450", "Fe300"))
+monte_carlo(c("O", "Si", "Ti", "Fe600", "Fe450", "Fe300"), model = "2para")
+
+
+
+
 
 # #Monte Carlo functions (without and with covariance)
 # CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
@@ -210,84 +340,18 @@ kap_MC_var[kap_MC_var <= 1e-6] = 1e-5
 ################### # EGH 08.20.18 REFACTORING
 
 # Monte Carlo functions (without and with covariance)
-refactor_CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
-  MIXDER_curve = list(0)
-  for (i in 1:MM) {
-    MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
-    cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
-              toString(MM)), sprintf('\r'))
-  }
-  return(MIXDER_curve)
-}
+# refactor_CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) { #Outputs the CI without using the vcov matrix of the parameters
+#   MIXDER_curve = list(0)
+#   for (i in 1:MM) {
+#     MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
+#     cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
+#               toString(MM)), sprintf('\r'))
+#   }
+#   return(MIXDER_curve)
+# }
 
 ################### END REFACTORING
 
-monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, n = 500, graph = T, background = 0.00071, cov = T){
-  ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
-  #r is a vector that sums up to 1
-  #ions is a vector of strings of the names of the ions in the mixture
-  #d is a vector of different dosage
-  #If cov = F plots out the result without using the cov matrix
-  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
-  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
-  L = info_table$L
-  Z.b = info_table$Z.b
-  out = MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, eta0 = eta0, eta1=eta1, sig0=sig0, kap = kap)
-  MIXDER = data.frame(d = d, CA = out[, 2] + background)
-  ninty_five_CI_lower = vector(length = length(d))
-  ninty_five_CI_upper = vector(length = length(d))
-  DERs <- matrix(nrow = n, ncol = length(d))
-  if (cov == F){
-    for (j in 1:n) {
-      DERs[j,] <-  MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[j], eta1 = eta1_MC_var[j], sig0 = sig0_MC_var[j], kap = kap_MC_var[j])[, 2]
-      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
-                toString(n)), sprintf('\r'))
-    }
-  }
-  else{
-    for (j in 1:n) {
-      DERs[j, ] <- MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[, 2]
-      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
-                toString(n)), sprintf('\r'))
-    }
-  }
-  for (i in 1:length(d)) {
-    sample_values <- sort(DERs[, i])
-    # Returning resulting CI
-    ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * n)] + background  #Need to add background prevalence of 0.00071 to every output
-    ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * n] + background
-  }
-
-  MIXDER$CI_lower = ninty_five_CI_lower
-  MIXDER$CI_upper = ninty_five_CI_upper
-  MIXDER$simpleeffect = IDER(d, ions = ions) + length(ions) * background #SCW: I believe we should add background prevalence to every IDER
-  names = colnames(MIXDER)
-  for (k in ions){
-    ider = IDER(d, ions = k)
-    MIXDER <- cbind(MIXDER, data.frame(ider))
-  }
-  colnames(MIXDER) <- c(names, ions)
-  if(graph == F){
-    return(MIXDER)
-  }
-  else{
-    CA <- MIXDER$CA
-    simpleeffect <- MIXDER$simpleeffect
-    plot(x = d * 100, y = CA * 100, type = "l", col = "red")
-    lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5)
-    for(i in 6:ncol(MIXDER)){
-      lines(x = d * 100, y = 100*as.vector(MIXDER[,i]), col = "green")
-    }
-    lines(x= d*100 , y = MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-    lines(x= d*100 , y = MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-    polygon(c(d*100,rev(d*100)),c(MIXDER$CI_lower * 100, rev(MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-  }
-}
-
-
-monte_carlo(c("Si", "Fe600"))
-monte_carlo(c("Si", "Fe600"), cov = F)
-monte_carlo(c("O", "Si", "Ti", " Fe600", "Fe450", "Fe300"))
 
 
 
@@ -300,232 +364,225 @@ monte_carlo(c("O", "Si", "Ti", " Fe600", "Fe450", "Fe300"))
 
 
 
-
-
-
-
-
-
-
-start_time <- Sys.time()
-#MIXDER of 2-ion (Silicon and Fe600) with 60 different dosage points and Monte Carlo Ribbon Plot using covariances
-d1 = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01))
-out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = d1, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat)
-two_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
-ninty_five_CI_lower = vector(length = length(d1))
-ninty_five_CI_upper = vector(length = length(d1))
-
-DERs <- matrix(nrow = MM, ncol = length(d1))
-# for (i in 1:length(d1)){ # EGH 07.22.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
-  # info = vector(length = 0)
-for (j in 1:MM) {
-  DERs[j, ] <- MIXDER_function(r = rep(1/2, times = 2), 
-                                 d = two_ion_MIXDER$d[1:length(d1)], L = c(100, 175), 
-                                 Z.b = c(690, 1075), eta0 = eta0_MC[j], 
-                                 eta1 = eta1_MC[j], sig0 = sig0_MC[j], 
-                                 kap = kap_MC[j])[, 2]
-  cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
-            toString(MM)), sprintf('\r'))
-}
-for (i in 1:length(d1)) {
-  sample_values <- sort(DERs[, i])
-  # Returning resulting CI
-  ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
-  ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
-  # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
-  # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
-}
-Sys.time() - start_time
-
-two_ion_MIXDER$CI_lower = ninty_five_CI_lower
-two_ion_MIXDER$CI_upper = ninty_five_CI_upper
-two_ion_MIXDER$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071 #SCW: I think here we should add background prevalence to every IDER instead (although this won't change the result much)
-two_ion_MIXDER$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
-two_ion_MIXDER$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
-#The graphing part
-d1 <- two_ion_MIXDER$d
-CA1 <- two_ion_MIXDER$CA
-simpleeffect1 <- two_ion_MIXDER$simpleeffect
-silicon1 <- two_ion_MIXDER$silicon
-ironsix1 <- two_ion_MIXDER$ironsix
-plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red")
-lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d1 * 100, y = silicon1* 100, col = "green")  
-lines(x = d1 * 100, y = ironsix1* 100, col = "green")
-lines(x= d1*100 , y = two_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-
-#2-ion 60 doses without using covariances
-# two_ion_MIXDER_var = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# start_time <- Sys.time()
+# #MIXDER of 2-ion (Silicon and Fe600) with 60 different dosage points and Monte Carlo Ribbon Plot using covariances
+# d1 = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01))
+# out = MIXDER_function(r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075), d = d1, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat)
+# two_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# ninty_five_CI_lower = vector(length = length(d1))
+# ninty_five_CI_upper = vector(length = length(d1))
+# 
+# DERs <- matrix(nrow = MM, ncol = length(d1))
+# # for (i in 1:length(d1)){ # EGH 07.22.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
+#   # info = vector(length = 0)
+# for (j in 1:MM) {
+#   DERs[j, ] <- MIXDER_function(r = rep(1/2, times = 2), 
+#                                  d = two_ion_MIXDER$d[1:length(d1)], L = c(100, 175), 
+#                                  Z.b = c(690, 1075), eta0 = eta0_MC[j], 
+#                                  eta1 = eta1_MC[j], sig0 = sig0_MC[j], 
+#                                  kap = kap_MC[j])[, 2]
+#   cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+#             toString(MM)), sprintf('\r'))
+# }
+# for (i in 1:length(d1)) {
+#   sample_values <- sort(DERs[, i])
+#   # Returning resulting CI
+#   ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
+#   ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
+#   # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
+#   # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
+# }
+# Sys.time() - start_time
+# 
+# two_ion_MIXDER$CI_lower = ninty_five_CI_lower
+# two_ion_MIXDER$CI_upper = ninty_five_CI_upper
+# two_ion_MIXDER$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071 #SCW: I think here we should add background prevalence to every IDER instead (although this won't change the result much)
+# two_ion_MIXDER$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
+# two_ion_MIXDER$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
+# #The graphing part
+# d1 <- two_ion_MIXDER$d
+# CA1 <- two_ion_MIXDER$CA
+# simpleeffect1 <- two_ion_MIXDER$simpleeffect
+# silicon1 <- two_ion_MIXDER$silicon
+# ironsix1 <- two_ion_MIXDER$ironsix
+# plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red")
+# lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
+# lines(x = d1 * 100, y = silicon1* 100, col = "green")  
+# lines(x = d1 * 100, y = ironsix1* 100, col = "green")
+# lines(x= d1*100 , y = two_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+# lines(x= d1*100 , y = two_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+# polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER$CI_lower * 100, rev(two_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+# 
+# #2-ion 60 doses without using covariances
+# # two_ion_MIXDER_var = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# # ninty_five_CI_lower = vector(length = 0)
+# # ninty_five_CI_upper = vector(length = 0)
+# # a = vector(length = 0)
+# # for (i in 2:length(d1)) {
+# #   print(d1[i])
+# #   a = CI_function_MIXDER_var(d = c(0, two_ion_MIXDER_var$d[i]), r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075))
+# #   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+# #   ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+# # }
+# 
+# ################## 08.20.18 EGH REFACTORING
+# start_time <- Sys.time()
+# curves <- refactor_CI_function_MIXDER_var(d = d1, r = rep(1/2, times = 2), 
+#                                           L = c(100, 175), Z.b = c(690, 1075))
 # ninty_five_CI_lower = vector(length = 0)
 # ninty_five_CI_upper = vector(length = 0)
-# a = vector(length = 0)
 # for (i in 2:length(d1)) {
-#   print(d1[i])
-#   a = CI_function_MIXDER_var(d = c(0, two_ion_MIXDER_var$d[i]), r = rep(1/2, times = 2), L = c(100, 175), Z.b = c(690, 1075))
-#   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-#   ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
-# }
-
-################## 08.20.18 EGH REFACTORING
-start_time <- Sys.time()
-curves <- refactor_CI_function_MIXDER_var(d = d1, r = rep(1/2, times = 2), 
-                                          L = c(100, 175), Z.b = c(690, 1075))
-ninty_five_CI_lower = vector(length = 0)
-ninty_five_CI_upper = vector(length = 0)
-for (i in 2:length(d1)) {
-  info = vector(length = 0)
-  for (j in 1:MM) {
-    info = c(info, curves[[j]][, 2][i])
-  }
-  info = sort(info)
-  lower = info[(1 - 0.95) / 2 * MM]
-  upper = info[(0.95 + (1 - 0.95) / 2) * MM]
-  ninty_five_CI_lower = c(ninty_five_CI_lower, lower)
-  ninty_five_CI_upper = c(ninty_five_CI_upper, upper)
-  cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
-            toString(length(d1))), sprintf('\r'))
-}
-Sys.time() - start_time
-################## END REFACTORING
-
-two_ion_MIXDER_var$CI_lower = c(0, ninty_five_CI_lower) + 0.00071
-two_ion_MIXDER_var$CI_upper = c(0, ninty_five_CI_upper) + 0.00071
-two_ion_MIXDER_var$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071
-two_ion_MIXDER_var$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
-two_ion_MIXDER_var$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
-
-d1 <- two_ion_MIXDER_var$d
-CA1 <- two_ion_MIXDER_var$CA
-simpleeffect1 <- two_ion_MIXDER_var$simpleeffect
-silicon1 <- two_ion_MIXDER_var$silicon
-ironsix1 <- two_ion_MIXDER_var$ironsix
-plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red")
-lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d1 * 100, y = silicon1* 100, col = "green")
-lines(x = d1 * 100, y = ironsix1* 100, col = "green")
-lines(x= d1*100 , y = two_ion_MIXDER_var$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d1*100 , y = two_ion_MIXDER_var$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER_var$CI_lower * 100, rev(two_ion_MIXDER_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-
-#MIXDER of 6-ion with 50 different dosage points and Monte Carlo Ribbon Plot using covariances
-d3 = c(seq(0, 0.009, 0.001), seq(0.01, 0.4, by = 0.01))
-out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.4, by = 0.01)))
-six_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
-ninty_five_CI_lower = vector(length = length(d3))
-ninty_five_CI_upper = vector(length = length(d3))
-
-# for (i in 1:length(d3)){
 #   info = vector(length = 0)
-#   for (j in 1:MM){
-#     info = c(info, MIXDER_function(r = rep(1/6, times = 6), c(0,  six_ion_MIXDER$d[i]),L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+#   for (j in 1:MM) {
+#     info = c(info, curves[[j]][, 2][i])
 #   }
 #   info = sort(info)
-#   ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
-#   ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+#   lower = info[(1 - 0.95) / 2 * MM]
+#   upper = info[(0.95 + (1 - 0.95) / 2) * MM]
+#   ninty_five_CI_lower = c(ninty_five_CI_lower, lower)
+#   ninty_five_CI_upper = c(ninty_five_CI_upper, upper)
+#   cat(paste("  Currently at Monte Carlo step:", toString(i), "of", 
+#             toString(length(d1))), sprintf('\r'))
 # }
+# Sys.time() - start_time
+# ################## END REFACTORING
+# 
+# two_ion_MIXDER_var$CI_lower = c(0, ninty_five_CI_lower) + 0.00071
+# two_ion_MIXDER_var$CI_upper = c(0, ninty_five_CI_upper) + 0.00071
+# two_ion_MIXDER_var$simpleeffect = IDER(d = 0.5*d1, L = 100, Z.b = 690) + IDER(d = 0.5*d1, L = 175, Z.b = 1075) + 0.00071
+# two_ion_MIXDER_var$silicon = IDER(d = d1, L = 100, Z.b = 690) + 0.00071
+# two_ion_MIXDER_var$ironsix = IDER(d = d1, L = 175, Z.b = 1075) + 0.00071
+# 
+# d1 <- two_ion_MIXDER_var$d
+# CA1 <- two_ion_MIXDER_var$CA
+# simpleeffect1 <- two_ion_MIXDER_var$simpleeffect
+# silicon1 <- two_ion_MIXDER_var$silicon
+# ironsix1 <- two_ion_MIXDER_var$ironsix
+# plot(x = d1 * 100, y = CA1 * 100, type = "l", col = "red")
+# lines(x = d1 * 100, y = simpleeffect1 * 100, col = "black", lty = 2, lwd = 0.5)
+# lines(x = d1 * 100, y = silicon1* 100, col = "green")
+# lines(x = d1 * 100, y = ironsix1* 100, col = "green")
+# lines(x= d1*100 , y = two_ion_MIXDER_var$CI_upper * 100, lty = 'dashed', col = 'red')
+# lines(x= d1*100 , y = two_ion_MIXDER_var$CI_lower * 100, lty = 'dashed', col = 'red')
+# polygon(c(d1*100,rev(d1*100)),c(two_ion_MIXDER_var$CI_lower * 100, rev(two_ion_MIXDER_var$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+# 
+# #MIXDER of 6-ion with 50 different dosage points and Monte Carlo Ribbon Plot using covariances
+# d3 = c(seq(0, 0.009, 0.001), seq(0.01, 0.4, by = 0.01))
+# out = MIXDER_function(r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), d = c(seq(0, 0.009, 0.001), seq(0.01, 0.4, by = 0.01)))
+# six_ion_MIXDER = data.frame(d = out[, 1], CA = out[, 2] + 0.00071)
+# ninty_five_CI_lower = vector(length = length(d3))
+# ninty_five_CI_upper = vector(length = length(d3))
+# 
+# # for (i in 1:length(d3)){
+# #   info = vector(length = 0)
+# #   for (j in 1:MM){
+# #     info = c(info, MIXDER_function(r = rep(1/6, times = 6), c(0,  six_ion_MIXDER$d[i]),L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585), eta0 = eta0_MC[j], eta1 = eta1_MC[j], sig0 = sig0_MC[j], kap = kap_MC[j])[,2][2])
+# #   }
+# #   info = sort(info)
+# #   ninty_five_CI_lower[i] = quantile(info,(1-0.95)/2) + 0.00071
+# #   ninty_five_CI_upper[i] = quantile(info,1-(1-0.95)/2) + 0.00071
+# # }
+# # six_ion_MIXDER$CI_lower = ninty_five_CI_lower
+# # six_ion_MIXDER$CI_upper = ninty_five_CI_upper
+# # six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
+# 
+# ######################## 08.20.18 EGH REFACTORING START
+# start_time <- Sys.time()
+# DERs <- matrix(nrow = MM, ncol = length(d3))
+# # for (i in 1:length(d3)){ # EGH 08.20.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
+# # info = vector(length = 0)
+# for (j in 1:MM) {
+#   DERs[j, ] <- MIXDER_function(r = rep(1/6, times = 6), 
+#                                d = six_ion_MIXDER$d[1:length(d3)], 
+#                                L = c(75, 100, 125, 175, 195, 240), 
+#                                Z.b = c(595, 690, 770, 1075, 1245, 1585),
+#                                eta0 = eta0_MC[j], eta1 = eta1_MC[j], 
+#                                sig0 = sig0_MC[j], kap = kap_MC[j])[, 2]
+#   cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+#             toString(MM)), sprintf('\r'))
+# }
+# for (i in 1:length(d3)) {
+#   sample_values <- sort(DERs[, i])
+#   # Returning resulting CI
+#   ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
+#   ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
+#   # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
+#   # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
+# }
+# start_time <- Sys.time()
+# 
+# ################### REFACTORING END
+# 
 # six_ion_MIXDER$CI_lower = ninty_five_CI_lower
 # six_ion_MIXDER$CI_upper = ninty_five_CI_upper
 # six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
-
-######################## 08.20.18 EGH REFACTORING START
-start_time <- Sys.time()
-DERs <- matrix(nrow = MM, ncol = length(d3))
-# for (i in 1:length(d3)){ # EGH 08.20.18 I strongly believe this is the area of the slowdown; we are calculating 29500 more curves then necessary.
-# info = vector(length = 0)
-for (j in 1:MM) {
-  DERs[j, ] <- MIXDER_function(r = rep(1/6, times = 6), 
-                               d = six_ion_MIXDER$d[1:length(d3)], 
-                               L = c(75, 100, 125, 175, 195, 240), 
-                               Z.b = c(595, 690, 770, 1075, 1245, 1585),
-                               eta0 = eta0_MC[j], eta1 = eta1_MC[j], 
-                               sig0 = sig0_MC[j], kap = kap_MC[j])[, 2]
-  cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
-            toString(MM)), sprintf('\r'))
-}
-for (i in 1:length(d3)) {
-  sample_values <- sort(DERs[, i])
-  # Returning resulting CI
-  ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * MM)]
-  ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * MM]
-  # ninty_five_CI_lower[i] = quantile(info,(1 - 0.95) / 2) + 0.00071
-  # ninty_five_CI_upper[i] = quantile(info,1 - (1 - 0.95) / 2) + 0.00071
-}
-start_time <- Sys.time()
-
-################### REFACTORING END
-
-six_ion_MIXDER$CI_lower = ninty_five_CI_lower
-six_ion_MIXDER$CI_upper = ninty_five_CI_upper
-six_ion_MIXDER$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
-
-
-#Get the individual IDERS
-six_ion_MIXDER$oxygen = IDER(d = d3, L = 75, Z.b = 595) + 0.00071
-six_ion_MIXDER$silicon = IDER(d = d3, L = 100, Z.b = 690) + 0.00071
-six_ion_MIXDER$titanium = IDER(d = d3, L = 125, Z.b = 770) + 0.00071
-six_ion_MIXDER$ironsix = IDER(d = d3, L = 175, Z.b = 1075) + 0.00071
-six_ion_MIXDER$ironfour = IDER(d = d3, L = 195, Z.b = 1245) + 0.00071
-six_ion_MIXDER$ironthree = IDER(d = d3, L = 240, Z.b = 1585) + 0.00071
-
-#The graphing part
-d3 <- six_ion_MIXDER$d
-CA3 <- six_ion_MIXDER$CA
-simpleeffect3 <- six_ion_MIXDER$simpleeffect
-silicon3 <- six_ion_MIXDER$silicon
-titanium3 <- six_ion_MIXDER$titanium
-ironthree3 <- six_ion_MIXDER$ironthree
-ironfour3 <- six_ion_MIXDER$ironfour
-ironsix3 <- six_ion_MIXDER$ironsix
-oxygen3 <- six_ion_MIXDER$oxygen
-plot(x = d3 * 100, y = CA3 * 100, type = "l", col = "red")
-lines(x = d3 * 100, y = simpleeffect3 * 100, col = "black", lty = 2, lwd = 0.5)
-lines(x = d3 * 100, y = silicon3* 100, col = "green")  
-lines(x = d3 * 100, y = titanium3* 100, col = "green")
-lines(x = d3 * 100, y = ironthree3* 100, col = "green")  
-lines(x = d3 * 100, y = ironfour3* 100, col = "green")
-lines(x = d3 * 100, y = ironsix3* 100, col = "green")  
-lines(x = d3 * 100, y = oxygen3* 100, col = "green")
-lines(x= d3*100 , y = six_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-lines(x= d3*100 , y = six_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-polygon(c(d3*100,rev(d3*100)),c(six_ion_MIXDER$CI_lower * 100, rev(six_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-
-#6-ion 50 doses without using covariances
-CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
-  MIXDER_curve = list(0)
-  for (i in 1:MM) {
-    MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
-  }
-  info = vector(length = 0)
-  for (i in 1:MM) {
-    info = c(info, MIXDER_curve[[i]][, 2][2])
-  }
-  info = sort(info)
-  lower_bound = info[(1-interval)/2*MM]
-  upper_bound = info[(interval + (1-interval)/2)*MM]
-  CI = c(lower_bound, upper_bound)
-  return(CI)
-}
-
-six_ion_MIXDER_var = six_ion_MIXDER
-ninty_five_CI_lower = vector(length = 0)
-ninty_five_CI_upper = vector(length = 0)
-a = vector(length = 0)
-
-for (i in 2:length(d3)) {
-  a = CI_function_MIXDER_var(d = c(0, six_ion_MIXDER_var$d[i]), r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585))
-  ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
-  ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
-}
-six_ion_MIXDER_var$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
-six_ion_MIXDER_var$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
-six_ion_MIXDER_var$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
-
-#Get the individual IDERS
-six_ion_MIXDER_var$oxygen = IDER(d = d3, L = 75, Z.b = 595) + 0.00071
-six_ion_MIXDER_var$silicon = IDER(d = d3, L = 100, Z.b = 690) + 0.00071
-six_ion_MIXDER_var$titanium = IDER(d = d3, L = 125, Z.b = 770) + 0.00071
-six_ion_MIXDER_var$ironsix = IDER(d = d3, L = 175, Z.b = 1075) + 0.00071
-six_ion_MIXDER_var$ironfour = IDER(d = d3, L = 195, Z.b = 1245) + 0.00071
-six_ion_MIXDER_var$ironthree = IDER(d = d3, L = 240, Z.b = 1585) + 0.00071
+# 
+# 
+# #Get the individual IDERS
+# six_ion_MIXDER$oxygen = IDER(d = d3, L = 75, Z.b = 595) + 0.00071
+# six_ion_MIXDER$silicon = IDER(d = d3, L = 100, Z.b = 690) + 0.00071
+# six_ion_MIXDER$titanium = IDER(d = d3, L = 125, Z.b = 770) + 0.00071
+# six_ion_MIXDER$ironsix = IDER(d = d3, L = 175, Z.b = 1075) + 0.00071
+# six_ion_MIXDER$ironfour = IDER(d = d3, L = 195, Z.b = 1245) + 0.00071
+# six_ion_MIXDER$ironthree = IDER(d = d3, L = 240, Z.b = 1585) + 0.00071
+# 
+# #The graphing part
+# d3 <- six_ion_MIXDER$d
+# CA3 <- six_ion_MIXDER$CA
+# simpleeffect3 <- six_ion_MIXDER$simpleeffect
+# silicon3 <- six_ion_MIXDER$silicon
+# titanium3 <- six_ion_MIXDER$titanium
+# ironthree3 <- six_ion_MIXDER$ironthree
+# ironfour3 <- six_ion_MIXDER$ironfour
+# ironsix3 <- six_ion_MIXDER$ironsix
+# oxygen3 <- six_ion_MIXDER$oxygen
+# plot(x = d3 * 100, y = CA3 * 100, type = "l", col = "red")
+# lines(x = d3 * 100, y = simpleeffect3 * 100, col = "black", lty = 2, lwd = 0.5)
+# lines(x = d3 * 100, y = silicon3* 100, col = "green")  
+# lines(x = d3 * 100, y = titanium3* 100, col = "green")
+# lines(x = d3 * 100, y = ironthree3* 100, col = "green")  
+# lines(x = d3 * 100, y = ironfour3* 100, col = "green")
+# lines(x = d3 * 100, y = ironsix3* 100, col = "green")  
+# lines(x = d3 * 100, y = oxygen3* 100, col = "green")
+# lines(x= d3*100 , y = six_ion_MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+# lines(x= d3*100 , y = six_ion_MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+# polygon(c(d3*100,rev(d3*100)),c(six_ion_MIXDER$CI_lower * 100, rev(six_ion_MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+# 
+# #6-ion 50 doses without using covariances
+# CI_function_MIXDER_var = function(d, d_interested, r, interval = 0.95, L, Z.beta) {
+#   MIXDER_curve = list(0)
+#   for (i in 1:MM) {
+#     MIXDER_curve[[i]] = MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, eta0 = eta0_MC_var[i], eta1 = eta1_MC_var[i], sig0 = sig0_MC_var[i], kap = kap_MC_var[i])
+#   }
+#   info = vector(length = 0)
+#   for (i in 1:MM) {
+#     info = c(info, MIXDER_curve[[i]][, 2][2])
+#   }
+#   info = sort(info)
+#   lower_bound = info[(1-interval)/2*MM]
+#   upper_bound = info[(interval + (1-interval)/2)*MM]
+#   CI = c(lower_bound, upper_bound)
+#   return(CI)
+# }
+# 
+# six_ion_MIXDER_var = six_ion_MIXDER
+# ninty_five_CI_lower = vector(length = 0)
+# ninty_five_CI_upper = vector(length = 0)
+# a = vector(length = 0)
+# 
+# for (i in 2:length(d3)) {
+#   a = CI_function_MIXDER_var(d = c(0, six_ion_MIXDER_var$d[i]), r = rep(1/6, times = 6), L = c(75, 100, 125, 175, 195, 240), Z.b = c(595, 690, 770, 1075, 1245, 1585))
+#   ninty_five_CI_lower = c(ninty_five_CI_lower, a[1])
+#   ninty_five_CI_upper = c(ninty_five_CI_upper, a[2])
+# }
+# six_ion_MIXDER_var$CI_lower = c(0, ninty_five_CI_lower + 0.00071)
+# six_ion_MIXDER_var$CI_upper = c(0, ninty_five_CI_upper + 0.00071)
+# six_ion_MIXDER_var$simpleeffect = IDER(d = 1/6*d3, L = 125, Z.b = 770) + IDER(d = 1/6*d3, L = 175, Z.b = 1075) + IDER(d = 1/6*d3, L = 75, Z.b = 595) + IDER(d = 1/6*d3, L = 100, Z.b = 690) + IDER(d = 1/6*d3, L = 195, Z.b = 1245) + IDER(d = 1/6*d3, L = 240, Z.b = 1585) + 0.00071
+# 
+# #Get the individual IDERS
+# six_ion_MIXDER_var$oxygen = IDER(d = d3, L = 75, Z.b = 595) + 0.00071
+# six_ion_MIXDER_var$silicon = IDER(d = d3, L = 100, Z.b = 690) + 0.00071
+# six_ion_MIXDER_var$titanium = IDER(d = d3, L = 125, Z.b = 770) + 0.00071
+# six_ion_MIXDER_var$ironsix = IDER(d = d3, L = 175, Z.b = 1075) + 0.00071
+# six_ion_MIXDER_var$ironfour = IDER(d = d3, L = 195, Z.b = 1245) + 0.00071
+# six_ion_MIXDER_var$ironthree = IDER(d = d3, L = 240, Z.b = 1585) + 0.00071
