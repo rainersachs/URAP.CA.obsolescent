@@ -122,7 +122,26 @@ MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_h
       })
     }
   }
-  
+  if (model == "3para"){
+    dE=function(yini,State,Pars){
+      eta0 = eta0; eta1 = eta1; sig0 = sig0
+      with(as.list(c(State, Pars)), {
+        sig = vector(length = length(L))
+        etaa = vector(length = length(L))
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          etaa[i] = eta0*L[i]*exp(-eta1*L[i])
+          u[i] = uniroot(function(d) sig0*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sig0*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
   else if (model == "2para"){
     dE = function(yini, State, Pars){
       sigm_0 = sigm_0; eta_0 = eta_0
@@ -148,6 +167,9 @@ MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_h
   return(out)
 }
 
+
+
+
 #====== an example of a plot: 6 HZE, each 1/6 of total dose ======#
 #Simple Effect Additivity (black line)
 SEA=function(d){
@@ -158,7 +180,7 @@ r=rep(1/6,6);L = c(75, 100, 125, 175, 195, 240); Z.b = c(595, 690, 770, 1075, 12
 
 MX=MIXDER_function(r, L, Z.b, d=dose, model = "4para") #for this mixture can't go much above 0.6#
 
-IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para") {
+IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para", alpha = alpha_hat) {
   #SCW: Added an option for inputting ion names instead of L, Z.b to decrease chance of transcription error and keep track of which ions are being mixed. (Old code should still work for now, but ideally we will change everything to this format in the future)
   #ions is a vector of strings of the names of the ions
   if (is.null(ions)){
@@ -168,15 +190,27 @@ IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = et
       eta = eta0*L*exp(-eta1*L)
       return(sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
     }
+    if (model == "3para"){
+      eta = eta0*L*exp(-eta1*L)
+      return(6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+    }
     if (model == "2para"){
       return(sigm_0*6.24*d/L*(1-exp(-1024*d/L)) + eta_0*(1-exp(-10^5*d)))
     }
+    if (model == "lowLET")
+      return(0.00001+ alpha * d)
   }
   r = 1/length(ions)
   info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise()
   info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
   output = 0
   if (model == "4para"){#After testing, this results in the same output as the old one besides rounding error that cannot be seen in the available digits
+    for (i in 1: nrow(info_table)){
+      output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = "4para", eta0 = eta0, sig0 = sig0, eta1 = eta1)
+    }
+    return(output)
+  }
+  if (model == "3para"){
     for (i in 1: nrow(info_table)){
       output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = "4para")
     }
@@ -185,6 +219,12 @@ IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = et
   else if (model == "2para"){
     for (i in 1: nrow(info_table)){
       output = output + IDER(d*r, L = info_table$L[i], model = "2para")
+    }
+    return(output)
+  }
+  else if (model == "lowLET"){
+    for (i in 1:row(info_table)){
+      output = output + IDER(d*r, model = "lowLET")
     }
     return(output)
   }
