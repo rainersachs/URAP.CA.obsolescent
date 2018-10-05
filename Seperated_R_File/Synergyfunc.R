@@ -71,28 +71,113 @@ information_critera_df = data.frame(AIC = c(NTE1_AIC, NTE2_AIC, IDER_AIC), BIC =
 information_critera_df #IDER has the lowest score (performs better) in both criteria.
 
 
-##MIXDER_function and graphs
-MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat ,kap = kap_hat) {
-  dE=function(yini,State,Pars){
-    eta0 = eta0; eta1 = eta1; sig0 = sig0; kap = kap
-    with(as.list(c(State, Pars)), {
-      P = vector(length = length(L))
-      sig = vector(length = length(L))
-      etaa = vector(length = length(L))
-      u = vector(length = length(L))
-      for (i in 1:length(L)) {
-        P[i] = (1-exp(-Z.b[i]/kap))^2
-        sig[i] = sig0*P[i] + 0.041/6.24*L[i]*(1-P[i])
-        etaa[i] = eta0*L[i]*exp(-eta1*L[i])
-        u[i] = uniroot(function(d) sig[i]*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
-      }
-      dI = vector(length = length(L))
-      for (i in 1:length(L)) {
-        dI[i] = r[i]*(sig[i]*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
-      }
-      dI = sum(dI)
-      return(list(c(dI)))
-    })
+#Parameter Calibration (Andy is in charge here)
+
+###########################
+
+
+#Individual Dose-Effect Relationship
+#Models include: 4para, 3para, 2para, 2paraTE, lowLET
+IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat, kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para", alpha = alpha_hat) {
+  #Main function that outputs the Individual dose-effect relationship. If "ions" are specified, take the average of them instead. 
+  #Right now this function requires that the calibrated parameters to be defined in the exact names as above. Need to work on this part.
+  if (is.null(ions)){
+    if (model == "4para"){
+      P = (1-exp(-Z.b/kap_hat))^2
+      sig = sig0*P + 0.041/6.24*L*(1-P)
+      eta = eta0*L*exp(-eta1*L)
+      return(sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+    }
+    if (model == "3para"){
+      eta = eta0*L*exp(-eta1*L)
+      return(6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+    }
+    if (model == "2para"){
+      return(sigm_0*6.24*d/L*(1-exp(-1024*d/L)) + eta_0*(1-exp(-10^5*d)))
+    }
+    if (model == "2paraTE"){
+      P = (1 - exp(-Z^2/(Z.b^2)))^2
+      sigma = te_sig0*P + (0.00041 * L/6.242)*(1-P)
+      return((sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
+    }
+    if (model == "lowLET")
+      return(0.00001+ alpha * d)
+  }
+  r = 1/length(ions)
+  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise()
+  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
+  output = 0
+  for (i in 1: nrow(info_table)){
+    output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = model)
+  }
+  return(output)
+  stop("Model Not Recognized")
+}
+
+#Mixture
+MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), eta0 = eta0_hat, eta1 = eta1_hat, sig0 = sig0_hat ,kap = kap_hat, sigm_0 = sigm_0_hat, eta_0 = eta_0_hat, model = "4para") {
+  if (model == "4para"){
+    dE=function(yini,State,Pars){
+      eta0 = eta0; eta1 = eta1; sig0 = sig0; kap = kap
+      with(as.list(c(State, Pars)), {
+        P = vector(length = length(L))
+        sig = vector(length = length(L))
+        etaa = vector(length = length(L))
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          P[i] = (1-exp(-Z.b[i]/kap))^2
+          sig[i] = sig0*P[i] + 0.041/6.24*L[i]*(1-P[i])
+          etaa[i] = eta0*L[i]*exp(-eta1*L[i])
+          u[i] = uniroot(function(d) sig[i]*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sig[i]*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
+  else if (model == "3para"){
+    dE=function(yini,State,Pars){
+      eta0 = eta0; eta1 = eta1; sig0 = sig0
+      with(as.list(c(State, Pars)), {
+        sig = vector(length = length(L))
+        etaa = vector(length = length(L))
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          etaa[i] = eta0*L[i]*exp(-eta1*L[i])
+          u[i] = uniroot(function(d) sig0*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + etaa[i]*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sig0*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + etaa[i]*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
+  else if (model == "2para"){
+    dE = function(yini, State, Pars){
+      sigm_0 = sigm_0; eta_0 = eta_0
+      with(as.list(c(State, Pars)), {
+        u = vector(length = length(L))
+        for (i in 1:length(L)) {
+          u[i] = uniroot(function(d) sigm_0*6.24*d/L[i]*(1-exp(-1024*d/L[i])) + eta_0*(1-exp(-10^5*d)) - I, lower = 0, upper = 1, extendInt = "yes", tol = 10^-10)$root
+        }
+        dI = vector(length = length(L))
+        for (i in 1:length(L)) {
+          dI[i] = r[i]*(sigm_0*6.24/L[i]*exp(-1024*u[i]/L[i])*(exp(1024*u[i]/L[i]) + 1024*u[i]/L[i] - 1) + eta_0*10^5*exp(-10^5*u[i]))
+        }
+        dI = sum(dI)
+        return(list(c(dI)))
+      })
+    }
+  }
+  else{
+    stop("Model Not Recognized")
   }
   pars = NULL; yini = c(I= 0); d = d
   out = ode(yini,times = d, dE, pars, method = "radau")
