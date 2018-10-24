@@ -1,0 +1,218 @@
+source('Synergy.R')
+
+#Confidence Intervals (Monte Carlo)
+set.seed(19970101)
+MM <- 500
+
+#A function that makes monte_carlo parameters into MM dataframes
+make_datapara <- function(l, model, n = MM){
+  name = model
+  df_list = list()
+  if (model == "4para"){
+    paras = c("eta0", "eta1", "sig0", "kap0")
+    for (i in 1:n){
+      value = c((l$eta0)[i], (l$eta1)[i], (l$sig0)[i], (l$kap0)[i])
+      df = data.frame(value, model = name, parameter = paras)
+      df_list[[i]] = df
+    }
+  }
+  else if (model == "3para"){
+    paras = c("eta0", "sig0", "eta1")
+    for (i in 1:n){
+      value = c((l$eta0)[i], (l$sig0)[i], (l$eta1)[i])
+      df = data.frame(value, model = name, parameter = paras)
+      df_list[[i]] = df
+    }
+  }
+  else if (model == "2para"){
+    paras = c("eta0", "sig0")
+    for (i in 1:n){
+      value = c((l$eta0)[i], (l$sig0)[i])
+      df = data.frame(value, model = name, parameter = paras)
+      df_list[[i]] = df
+    }
+  }
+  return(df_list)
+}
+
+####################################################
+#Monte-Carlo Parameters
+#In this section, we are conditioning on kappa > 0 (by dropping them negative ones and redraw the sample). 
+#Also, we are making sig0 > 0 (by replacing the negative values with a small positive number 1e-6)
+
+#Sample parameters from their distributions with covariances for 4para
+monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = Data_parameter[6,1], eta1 = Data_parameter[7,1], sig0 = Data_parameter[8,1], kap = Data_parameter[9,1]), sigma = sig_4para)
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[,4] > 1e-6, ] #Dropping negative kappas
+
+negative_kap_4para_cov = MM - nrow(monte_carlo_parameters) #The number of kap < 0
+
+while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
+  new_row = rmvnorm(n = 1, mean = c(eta0 = Data_parameter[6,1], eta1 = Data_parameter[7,1], sig0 = Data_parameter[8,1], kap = Data_parameter[9,1]), sigma = sig_4para)
+  if (as.numeric(new_row[,4]) > 1e-6){
+    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
+  }
+}
+eta0_MC = monte_carlo_parameters[, 1]
+eta1_MC = monte_carlo_parameters[, 2]
+sig0_MC = monte_carlo_parameters[, 3]
+kap_MC = monte_carlo_parameters[, 4]
+
+
+#Sample parameters from their distributions without covariances
+eta0_MC_var = rnorm(MM, mean = Data_parameter[6,1], sd = sqrt(sig_4para[1,1]))
+eta1_MC_var = rnorm(MM, mean = Data_parameter[7,1], sd = sqrt(sig_4para[2,2]))
+sig0_MC_var = rnorm(MM, mean = Data_parameter[8,1], sd = sqrt(sig_4para[3,3]))
+kap_MC_var = rnorm(MM, mean = Data_parameter[9,1], sqrt(sig_4para[4,4]))
+
+negative_kap_4para_var = MM - length(kap_MC_var) #The number of kap < 0
+
+while (length(kap_MC_var) < MM){  #Running a while loop to get enough draws from the normal 
+  new_value = rnorm(1, mean = Data_parameter[9,1], sqrt(sig_4para[4,4]))
+  if (new_value > 1e-6){
+    kap_MC_var = c(kap_MC_var, new_value)
+  }
+}
+
+para_4para_cov =  c(eta0 = list(eta0_MC), eta1 = list(eta1_MC),sig0 = list(sig0_MC), kap0 = list(kap_MC))
+para_4para_nocov = c(eta0 = list(eta0_MC_var), eta1 = list(eta1_MC_var),sig0 = list(sig0_MC_var),kap0 =list(kap_MC_var))
+
+#Sample parameters from their distributions with covariances for Three parameter model.
+monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = Data_parameter[3,1], sig0 = Data_parameter[4,1], eta1 = Data_parameter[5,1]), sigma = sig_3para)
+
+negative_sig0_3para_cov = sum(monte_carlo_parameters[,2] <= 1e-6) #The number of sig0 < 0
+
+monte_carlo_parameters[monte_carlo_parameters[,2] <= 1e-6, ][2] = 1e-5
+
+
+
+eta0_MC = monte_carlo_parameters[, 1]
+sig0_MC = monte_carlo_parameters[, 2]
+eta1_MC = monte_carlo_parameters[, 3]
+
+#Sample parameters from their distributions without covariances for Three parameter model.
+eta0_MC_var = rnorm(MM, mean = Data_parameter[3,1], sd = sqrt(sig_3para[1,1]))
+sig0_MC_var = rnorm(MM, mean = Data_parameter[4,1], sd = sqrt(sig_3para[2,2]))
+eta1_MC_var = rnorm(MM, mean = Data_parameter[5,1], sd = sqrt(sig_3para[3,3]))
+
+negative_sig0_3para_var = sum(sig0_MC_var <= 1e-6) #The number of sig0 < 0
+sig0_MC_var[sig0_MC_var <= 1e-6] = 1e-5
+
+para_3para_cov =  c(eta0 = list(eta0_MC), sig0 = list(sig0_MC),eta1 = list(eta1_MC))
+para_3para_nocov = c(eta0 = list(eta0_MC_var),sig0 = list(sig0_MC_var),eta1 = list(eta1_MC_var))
+
+#Sample parameters from their distributions with covariances for 2para
+monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = Data_parameter[1,1], sig0 = Data_parameter[2,1]), sigma = sig_2para)
+negative_sig0_2para_cov = sum(monte_carlo_parameters[,2] <= 1e-6) #The number of sig0 < 0
+
+monte_carlo_parameters[monte_carlo_parameters[,2] <= 1e-6, ][2] = 1e-5
+
+
+eta0_MC = monte_carlo_parameters[, 1]
+sig0_MC = monte_carlo_parameters[, 2]
+
+
+#Sample parameters from their distributions without covariances for 2para
+
+eta0_MC_var = rnorm(MM, mean = Data_parameter[1,1], sd = sqrt(sig_2para[1,1]))
+sig0_MC_var = rnorm(MM, mean = Data_parameter[2,1], sd = sqrt(sig_2para[2,2]))
+
+negative_sig0_2para_var = sum(sig0_MC_var <= 1e-6) #The number of sig0 < 0
+sig0_MC_var[sig0_MC_var <= 1e-6] = 1e-5
+
+para_2para_cov =  c(eta0 = list(eta0_MC),sig0 = list(sig0_MC))
+para_2para_nocov= c(eta0 = list(eta0_MC_var),sig0 = list(sig0_MC_var))
+
+# #Sample parameters from their distributions with covariances for 2para TE only
+# monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = Data_parameter[9,1], sig0 = Data_parameter[10,1], sigma = sig_2paraTE))
+# sig0_MC = monte_carlo_parameters[, 1]
+# kap0_MC = monte_carlo_parameters[, 2]
+# #Sample parameters from their distributions without covariances for 2para TE only
+# sig0_MC_var = rnorm(MM, mean = Data_parameter[9,1], sd = sqrt(sig_2paraTE[1,1]))
+# kap0_MC_var = rnorm(MM, mean = Data_parameter[10,1], sd = sqrt(sig_2paraTE[2,2]))
+# para_2paraTE_nocov =  c(list(sig0_MC),list(kap0_MC))
+# para_2paraTE_cov= c(list(sig0_MC_var),list(kap0_MC_var))
+
+#Monte Carlo
+MC_2para_cov = make_datapara(para_2para_cov, model = "2para",n = MM)
+MC_2para_var = make_datapara(para_2para_nocov, model = "2para",n = MM)
+MC_3para_cov = make_datapara(para_3para_cov, model = "3para",n = MM)
+MC_3para_var = make_datapara(para_3para_nocov, model = "3para",n = MM)
+MC_4para_cov = make_datapara(para_4para_cov, model = "4para", n = MM)
+MC_4para_var = make_datapara(para_4para_nocov, model = "4para", n = MM)
+
+MC_2para = list(MC_2para_cov, MC_2para_var, name = "2para")
+MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
+MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
+###############################################
+
+monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, graph = T, background = 0.00071, cov = T, model = NULL){
+  ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
+  #r is a vector that sums up to 1
+  #ions is a vector of strings of the names of the ions in the mixture
+  #d is a vector of different dosage
+  #para is a list (MC_2para, MC_3para, or MC_4para), and it will tell the function which model to use
+  #If cov = F plots out the result without using the cov matrix
+  #the maximum number for n is MM (in this case MM = 500)
+  if (is.null(model)){
+    model = para$name
+  }
+  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
+  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
+  L = info_table$L
+  Z.b = info_table$Z.b
+  out = MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, model = model, parameters = Data_parameter)
+  MIXDER = data.frame(d = d, CA = out[, 2] + background)
+  ninty_five_CI_lower = vector(length = length(d))
+  ninty_five_CI_upper = vector(length = length(d))
+  DERs <- matrix(nrow = n, ncol = length(d))
+  if (cov == F){
+    MC_parameter = para[[2]]
+  }
+  else{
+    MC_parameter = para[[1]]
+  }
+    
+  for (j in 1:n) {
+      DERs[j,] <-  MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, model = model, parameters = MC_parameter[[j]])[, 2]
+      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+                toString(n)), sprintf('\r'))
+  }
+  for (i in 1:length(d)) {
+    sample_values <- sort(DERs[, i])
+    # Returning resulting CI
+    ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * n)] + background  #Need to add background prevalence of 0.00071 to every output
+    ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * n] + background
+  }
+  MIXDER$CI_lower = ninty_five_CI_lower
+  MIXDER$CI_upper = ninty_five_CI_upper
+  MIXDER$simpleeffect = IDER(d, ions = ions, model = model, parameters = Data_parameter) + background #SCW: I believe we should add background prevalence to every IDER
+  names = colnames(MIXDER)
+  for (k in ions){
+    ider = IDER(d, ions = k, model = model, parameters = Data_parameter)
+    MIXDER <- cbind(MIXDER, data.frame(ider))
+  }
+  colnames(MIXDER) <- c(names, ions)
+  if(graph == F){
+    return(MIXDER)
+  }
+  else{
+    CA <- MIXDER$CA
+    simpleeffect <- MIXDER$simpleeffect
+    plot(x = d * 100, y = CA * 100, type = "l", col = "red")
+    lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5)
+    for(i in 6:ncol(MIXDER)){
+      lines(x = d * 100, y = 100*as.vector(MIXDER[,i]), col = "green")
+    }
+    lines(x= d*100 , y = MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+    lines(x= d*100 , y = MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+    polygon(c(d*100,rev(d*100)),c(MIXDER$CI_lower * 100, rev(MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+  }
+}
+
+monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_4para, n = 100)
+monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_4para, n = 100, cov = F)
+monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_2para, n = 100)
+
+
+monte_carlo(ions = c("Fe600", "Si170"), para = MC_3para, n = 100)
+monte_carlo(ions = c("Fe600", "Si170"), para = MC_2para, n = 100)
