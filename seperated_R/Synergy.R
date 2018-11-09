@@ -43,8 +43,8 @@ model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=modified_df,start = 
                          weights = (1/(modified_df$error)^2))
 ccoef = coef(model_3para)
 eta0_Threepara = as.numeric(ccoef[1])
-sigm0_Threepara = as.numeric(ccoef[2])
-eta1_Threepara = as.numeric(ccoef[3])
+eta1_Threepara = as.numeric(ccoef[2])
+sigm0_Threepara = as.numeric(ccoef[3])
 sig_3para = vcov(model_3para)
 #Calibration for 4-parameter model
 model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
@@ -162,8 +162,8 @@ LOO = function(model,modified_df,func){
                           weights = (1/(modified_df$error)^2))
       ccoef = coef(model_3para)
       eta0_Threepara = as.numeric(ccoef[1])
-      sigm0_Threepara = as.numeric(ccoef[2])
-      eta1_Threepara = as.numeric(ccoef[3])
+      sigm0_Threepara = as.numeric(ccoef[3])
+      eta1_Threepara = as.numeric(ccoef[2])
       value$CA_value[i] = test$CA
       value$CA_predict[i] = func(test$d,test$L,eta0_Threepara,sigm0_Threepara,eta1_Threepara)}
   }
@@ -308,7 +308,6 @@ MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), parameters = 
     dE=function(yini,State,Pars){
       eta0 = eta0; eta1 = eta1; sig0 = sig0
       with(as.list(c(State, Pars)), {
-        sig = vector(length = length(L))
         etaa = vector(length = length(L))
         u = vector(length = length(L))
         for (i in 1:length(L)) {

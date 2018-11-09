@@ -145,7 +145,7 @@ MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
 MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
 ###############################################
 
-monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, graph = T, background = 0.00071, cov = T, model = NULL){
+monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, background = 0.00071, cov = T, model = NULL){
   ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
   #r is a vector that sums up to 1
   #ions is a vector of strings of the names of the ions in the mixture
@@ -171,17 +171,27 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
   else{
     MC_parameter = para[[1]]
   }
-    
+  bad_j = c()
   for (j in 1:n) {
-      DERs[j,] <-  MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, model = model, parameters = MC_parameter[[j]])[, 2]
-      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+    der = try(MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, model = model, parameters = MC_parameter[[j]])[, 2])
+    if (class(der) == "try-error"){ #Does not hault the 
+      bad_j = c(bad_j, j)
+      DERs[j,] <- out[,2]
+    }
+    else{
+      DERs[j,] = der
+    }
+    cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
                 toString(n)), sprintf('\r'))
+  }
+  if (length(bad_j) > 0){
+    print(paste("Non-Convergence at i = ", bad_j))
   }
   for (i in 1:length(d)) {
     sample_values <- sort(DERs[, i])
     # Returning resulting CI
-    ninty_five_CI_lower[i] <- sample_values[ceiling((1 - 0.95) / 2 * n)] + background  #Need to add background prevalence of 0.00071 to every output
-    ninty_five_CI_upper[i] <- sample_values[(0.95 + (1 - 0.95) / 2) * n] + background
+    ninty_five_CI_lower[i] <- as.numeric(quantile(sample_values, 0.025)) + background  #Need to add background prevalence of 0.00071 to every output
+    ninty_five_CI_upper[i] <- as.numeric(quantile(sample_values, 0.975)) + background
   }
   MIXDER$CI_lower = ninty_five_CI_lower
   MIXDER$CI_upper = ninty_five_CI_upper
@@ -192,27 +202,7 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
     MIXDER <- cbind(MIXDER, data.frame(ider))
   }
   colnames(MIXDER) <- c(names, ions)
-  if(graph == F){
-    return(MIXDER)
-  }
-  else{
-    CA <- MIXDER$CA
-    simpleeffect <- MIXDER$simpleeffect
-    plot(x = d * 100, y = CA * 100, type = "l", col = "red")
-    lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5)
-    for(i in 6:ncol(MIXDER)){
-      lines(x = d * 100, y = 100*as.vector(MIXDER[,i]), col = "green")
-    }
-    lines(x= d*100 , y = MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
-    lines(x= d*100 , y = MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
-    polygon(c(d*100,rev(d*100)),c(MIXDER$CI_lower * 100, rev(MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
-  }
+  return(list(MIXDER, bad_j))
 }
 
-monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_4para, n = 100)
-monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_4para, n = 100, cov = F)
-monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_2para, n = 100)
 
-
-monte_carlo(ions = c("Fe600", "Si170"), para = MC_3para, n = 100)
-monte_carlo(ions = c("Fe600", "Si170"), para = MC_2para, n = 100)
