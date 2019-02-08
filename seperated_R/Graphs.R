@@ -12,11 +12,13 @@ MC_results_2para_cov = monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), pa
 MIXDER_2para_cov = MC_results_2para_cov[[1]] #This is the dataframe that will be passed into the graph
 non_convergence_2para_cov = MC_results_2para_cov[[2]]
 
-MC_results_3para_cov = monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_3para, n = 100) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
+MC_results_3para_cov = monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_3para, n = 500) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
 MIXDER_3para_cov = MC_results_3para_cov[[1]] #This is the dataframe that will be passed into the graph
 non_convergence_3para_cov = MC_results_3para_cov[[2]]
 
-
+MC_results_3para_var = monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_3para, n = 500, cov = F) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
+MIXDER_3para_var = MC_results_3para_var[[1]] #This is the dataframe that will be passed into the graph
+non_convergence_3para_var = MC_results_3para_var[[2]]
 #############################################################################################
 #Functions 
 
@@ -63,10 +65,16 @@ IDER_graph <- function(ions = "O350", model = "4para", data = modified_df, point
 monte_carlo_graph(MIXDER_4para_cov, "4-Parameter Model with Covariances")
 monte_carlo_graph(MIXDER_4para_var, "4-Parameter Model without Covariances")
 monte_carlo_graph(MIXDER_3para_cov, "3-Parameter Model with Covariances")
+monte_carlo_graph(MIXDER_3para_var, "3-Parameter Model without Covariances")
+
 monte_carlo_graph(MIXDER_2para_cov, "2-Parameter Model with Covariances")
 
 IDER_graph(ions = "O55", model = "4para", point = T)
+IDER_graph(ions = "O350", model = "4para", point = T)
+IDER_graph(ions = "O55", model = "3para", point = T)
+IDER_graph(ions = "O350", model = "3para", point = T)
+
 IDER_graph(ions = "O55", model = "2para", point = T)
 
-IDER_graph(ions = c("O350", "O55"), model = "4para", point = T) #If the ions argument has more than 1 ion, the output line is an average (r = 1/n)
+IDER_graph(ions = c("O350", "O55"), model = "3para", point = T) #If the ions argument has more than 1 ion, the output line is an average (r = 1/n)
 IDER_graph(model = "2para", point = F)

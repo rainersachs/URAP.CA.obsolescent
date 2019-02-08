@@ -106,7 +106,7 @@ L_function = function(func, eta0=0, eta1=0, sig0=0, kap=0,model){
 
 L_2para = L_function(func_2para, eta0 = filter(parameters_2para, parameter == "eta0")$value ,sig0 = filter(parameters_2para, parameter == "sig0")$value,model ="2para")
 L_3para = L_function(func_3para, eta0 = filter(parameters_3para, parameter == "eta0")$value, eta1 = filter(parameters_3para, parameter == "eta1")$value, sig0 = filter(parameters_3para, parameter == "sig0")$value, model = "3para")
-L_4para  = L_function(func_4para, eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value,filter(parameters_3para, parameter == "kap0")$value,model = "4para")
+L_4para  = L_function(func_4para, eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value,model = "4para")
 L_2paraTE = L_function(func_2paraTE,sig0 = filter(parameters_2paraTE, parameter == "sig0")$value, kap = filter(parameters_2paraTE, parameter == "kap0")$value,model = "2paraTE")
 
 WRSS_2para = sum((1/modified_df$error^2)*L_2para)
