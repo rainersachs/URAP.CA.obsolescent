@@ -38,27 +38,54 @@ monte_carlo_graph <- function(MIXDER, model_name = "Model Name"){
   title(paste("Monte Carlo Plot for", model_name))
 }
 
-IDER_graph <- function(ions = "O350", model = "4para", data = modified_df, point = F, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01))){
-  CA = IDER(d = d, ions = ions, model = model)
-  data_filtered = data[(data$ion %in% ions) & (data$d <= 0.5),]
-  data_d = 100*data_filtered$d
-  data_CA = data_filtered$CA
-  n = length(ions)
-  names = ions[1]
-  if (n > 1){
-    for (i in 2:n){
-      names = paste(names, ",", ions[i])
+IDER_graph <- function(data = modified_df, ions = "O350", model = "4para", point = T, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01))){
+  if(nrow(data) == nrow(modified_df)){
+    CA = IDER(d = d, ions = ions, model = model)
+    data_filtered = data[(data$ion %in% ions) & (data$d <= 0.5),]
+    data_d = 100*data_filtered$d
+    data_CA = data_filtered$CA
+    n = length(ions)
+    names = ions[1]
+    if (n > 1){
+      for (i in 2:n){
+        names = paste(names, ",", ions[i])
+      }
+    }
+    print(max(data_CA))
+    plot(x = d * 100, y = CA, type = "l", col = "green", ylim = c(0, 1.5*max(data_CA)))
+    title(paste(model, "IDER Plot for", names))
+    if(point){#Option to add the scatter plot from the true data onto the IDER plot
+      points(data_d, data_CA)
     }
   }
-  print(max(data_CA))
-  plot(x = d * 100, y = CA, type = "l", col = "green", ylim = c(0, 1.5*max(data_CA)))
-  title(paste(model, "IDER Plot for", names))
-  if(point){#Option to add the scatter plot from the true data onto the IDER plot
-    points(data_d, data_CA)
+  else{
+    ions = unique(data$ion)
+    CA = IDER(d = d, ions = ions, model = model)
+    data_filtered = data
+    data_d = 100*data_filtered$d
+    data_CA = data_filtered$CA
+    n = length(ions)
+    names = ions[1]
+    if (n > 1){
+      for (i in 2:n){
+        names = paste(names, ",", ions[i])
+      }
+    }
+    print(max(data_CA))
+    plot(x = d * 100, y = CA, type = "l", col = "green", ylim = c(0, 1.5*max(data_CA)))
+    title(paste(model, "IDER Plot for", names))
+    if(point){#Option to add the scatter plot from the true data onto the IDER plot
+      points(data_d, data_CA)
+    }
   }
 }
 
-
+##################################################################
+#Selecting Specific Data by Using Function subset().
+#Example: Subset: d >= 0.05, CA > 0.01, Z = 22 and Comment section includes "2018"
+subset(modified_df, d >= 0.05 & CA > 0.01 & Z == 22 & grepl("2018", Comment))
+#This returns a sub dataset with all the rows that satisfy the restrictions put in, which you can put in to the function "IDER_graph" as the only input. See example below.
+IDER_graph(subset(modified_df, d >= 0.05 & CA > 0.01 & Z == 22))
 ##################################################################
 #Plots
 
