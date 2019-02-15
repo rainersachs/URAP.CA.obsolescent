@@ -71,7 +71,6 @@ IDER_graph <- function(data = modified_df, ions = "O350", model = "4para", point
         names = paste(names, ",", ions[i])
       }
     }
-    print(max(data_CA))
     plot(x = d * 100, y = CA, type = "l", col = "green", ylim = c(0, 1.5*max(data_CA)))
     title(paste(model, "IDER Plot for", names))
     if(point){#Option to add the scatter plot from the true data onto the IDER plot
@@ -105,3 +104,56 @@ IDER_graph(ions = "O55", model = "2para", point = T)
 
 IDER_graph(ions = c("O350", "O55"), model = "3para", point = T) #If the ions argument has more than 1 ion, the output line is an average (r = 1/n)
 IDER_graph(model = "2para", point = F)
+
+
+###################################################################
+#Plotting Ideas
+
+library(ggplot2)
+library(tidyr)
+theme_update(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) #This centers plot titles for ggplots
+
+#Monte Carlo with Actual Data
+example = subset(modified_df, ion %in% c("Fe600", "Si170", "O55", "O350") & d <= 0.5)
+MIXDER = MIXDER_4para_cov
+d = MIXDER$d
+CA <- MIXDER$CA
+simpleeffect <- MIXDER$simpleeffect
+plot(x = d * 100, y = CA * 100, type = "l", col = "red")
+lines(x = d * 100, y = simpleeffect * 100, col = "black", lty = 2, lwd = 0.5)
+for(i in 6:ncol(MIXDER)){
+  lines(x = d * 100, y = 100*as.vector(MIXDER[,i]), col = "green")
+}
+lines(x= d*100 , y = MIXDER$CI_upper * 100, lty = 'dashed', col = 'red')
+lines(x= d*100 , y = MIXDER$CI_lower * 100, lty = 'dashed', col = 'red')
+points(example$d * 100, example$CA * 100)
+polygon(c(d*100,rev(d*100)),c(MIXDER$CI_lower * 100, rev(MIXDER$CI_upper * 100)),col = rgb(1, 0, 0,0.5), border = NA)
+
+#ggplot example, using the same 4 ions.
+names(MIXDER)[2] <- "mixDER"
+thin_df <- gather(MIXDER, "ion", "IDER", -c(1:5))
+ggplot(data = thin_df, aes(x = d * 100)) + #This example consists a mixture of 4 ions: "Fe600", "Si170", "O55", "O350". 
+  
+  geom_line(aes(y = 100 * IDER, color = ion), size = 1) +  #IDERs (colored solid lines)
+  geom_ribbon(aes(ymin = 100 * CI_lower, ymax = 100 * CI_upper), fill = "red", alpha = 0.3) + #MonteCarlo Ribbons (red ribbons)
+  geom_point(data = example, aes(x= 100*d, y = 100*CA, color = ion), size = 2) + #Actual Data for these for types of ions (colored points)
+  geom_line(aes(y = 100*mixDER, linetype = "MIXDER"), size = 1.2) + #MIXDER (black solid line)
+  geom_line(aes(y = 100*simpleeffect, linetype = "SEA")) + #Simple Effect Additivity (black dashed line)
+  
+  scale_color_manual("Ions", values=c("blue", "darkgreen", "brown", "#56B4E9")) + #legend for Ions
+  scale_linetype_manual("Mixture", breaks = c("MIXDER", "SEA"), values = c("solid", "dashed")) + #legend for Mixture
+  
+  theme(panel.background = element_rect(fill = "white", colour = "grey50"),  #Some random tweeks of the ggplot theme. Need someone more artistic to do this part :)
+        panel.grid.major.y = element_line(colour = "grey80"),
+        panel.grid.minor.y = element_line(linetype = "dashed", colour = "grey80"),
+        panel.grid.major.x = element_blank(),
+        axis.ticks = element_line(),
+        plot.title = element_text(size = 20, face = "bold"), 
+        axis.title = element_text(size = 15, face = "bold"),
+        legend.title = element_text(size = 12, face = "bold")
+        ) +
+  
+  labs(x = "100*Dosage", y = "100*Chromosomal Aberrations", title = "Dose Effect Relationships", subtitle = "Fe600, Si170, O55, O350") #axis labels and plot title
+
+
+###########################################################################
