@@ -146,7 +146,7 @@ MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
 MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
 ###############################################
 
-monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, background = 0.00071, cov = T, model = NULL){
+monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, background = 0, cov = T, model = NULL, IDER = F){
   ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
   #r is a vector that sums up to 1
   #ions is a vector of strings of the names of the ions in the mixture
@@ -154,56 +154,99 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
   #para is a list (MC_2para, MC_3para, or MC_4para), and it will tell the function which model to use
   #If cov = F plots out the result without using the cov matrix
   #the maximum number for n is MM (in this case MM = 500)
+  #If IDER = T then this outputs ribbons for IDER instead of MIXDER
   if (is.null(model)){
     model = para$name
-  }
-  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
-  info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
-  L = info_table$L
-  Z.b = info_table$Z.b
-  out = MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, model = model, parameters = Data_parameter)
-  MIXDER = data.frame(d = d, CA = out[, 2] + background)
-  ninty_five_CI_lower = vector(length = length(d))
-  ninty_five_CI_upper = vector(length = length(d))
-  DERs <- matrix(nrow = n, ncol = length(d))
-  if (cov == F){
-    MC_parameter = para[[2]]
-  }
-  else{
-    MC_parameter = para[[1]]
-  }
-  bad_j = c()
-  for (j in 1:n) {
-    der = try(MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, model = model, parameters = MC_parameter[[j]])[, 2])
-    if (class(der) == "try-error"){ #Does not hault the 
-      bad_j = c(bad_j, j)
-      DERs[j,] <- out[,2]
+  }  
+  if (IDER){ #This section is for IDER ribbon
+    if (length(ions) > 1) {stop("Only one ion allowed for IDER")}
+    out = IDER(d, ions = ions, model = model, parameters = Data_parameter)
+    IDER_table = data.frame(d = d, IDER = out + background)
+    if (cov == F){
+      MC_parameter = para[[2]]
     }
     else{
-      DERs[j,] = der
+      MC_parameter = para[[1]]
     }
-    cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+    bad_j = c()
+    DERs <- matrix(nrow = n, ncol = length(d))
+    for (j in 1:n) {
+      der = IDER(d, ions = ions, model = model, parameters = MC_parameter[[j]])
+      if (class(der) == "try-error"){ #Does not hault the 
+        bad_j = c(bad_j, j)
+        DERs[j,] <- out
+      }
+      else{
+        DERs[j,] = der
+      }
+      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
                 toString(n)), sprintf('\r'))
+    }
+    if (length(bad_j) > 0){
+      print(paste("Non-Convergence at i = ", bad_j))
+    }
+    ninty_five_CI_lower = numeric(length(d))
+    ninty_five_CI_upper = numeric(length(d))
+    for (i in 1:length(d)) {
+      sample_values <- sort(DERs[, i])
+      # Returning resulting CI
+      ninty_five_CI_lower[i] <- as.numeric(quantile(sample_values, 0.025)) + background  #Background default is 0 (for DER)
+      ninty_five_CI_upper[i] <- as.numeric(quantile(sample_values, 0.975)) + background
+    }
+    IDER_table$CI_lower = ninty_five_CI_lower
+    IDER_table$CI_upper = ninty_five_CI_upper
+    return(list(IDER_table, bad_j))
   }
-  if (length(bad_j) > 0){
-    print(paste("Non-Convergence at i = ", bad_j))
+  
+  else{ #This section is for MIXDER ribbon
+    info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
+    info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
+    L = info_table$L
+    Z.b = info_table$Z.b
+    out = MIXDER_function(r = r, L = L, Z.b = Z.b, d = d, model = model, parameters = Data_parameter)
+    MIXDER = data.frame(d = d, CA = out[, 2] + background)
+    ninty_five_CI_lower = vector(length = length(d))
+    ninty_five_CI_upper = vector(length = length(d))
+    DERs <- matrix(nrow = n, ncol = length(d))
+    if (cov == F){
+      MC_parameter = para[[2]]
+    }
+    else{
+      MC_parameter = para[[1]]
+    }
+    bad_j = c()
+    for (j in 1:n) {
+      der = try(MIXDER_function(r = r, d = d, L = L, Z.b = Z.b, model = model, parameters = MC_parameter[[j]])[, 2])
+      if (class(der) == "try-error"){ #Does not hault the 
+        bad_j = c(bad_j, j)
+        DERs[j,] <- out[,2]
+      }
+      else{
+        DERs[j,] = der
+      }
+      cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
+                  toString(n)), sprintf('\r'))
+    }
+    if (length(bad_j) > 0){
+      print(paste("Non-Convergence at i = ", bad_j))
+    }
+    for (i in 1:length(d)) {
+      sample_values <- sort(DERs[, i])
+      # Returning resulting CI
+      ninty_five_CI_lower[i] <- as.numeric(quantile(sample_values, 0.025)) + background  #Background default is 0 (for DER)
+      ninty_five_CI_upper[i] <- as.numeric(quantile(sample_values, 0.975)) + background
+    }
+    MIXDER$CI_lower = ninty_five_CI_lower
+    MIXDER$CI_upper = ninty_five_CI_upper
+    MIXDER$simpleeffect = IDER(d, ions = ions, model = model, parameters = Data_parameter) + background #SCW: I believe we should add background prevalence to every IDER
+    names = colnames(MIXDER)
+    for (k in ions){
+      ider = IDER(d, ions = k, model = model, parameters = Data_parameter)
+      MIXDER <- cbind(MIXDER, data.frame(ider))
+    }
+    colnames(MIXDER) <- c(names, ions)
+    return(list(MIXDER, bad_j))
   }
-  for (i in 1:length(d)) {
-    sample_values <- sort(DERs[, i])
-    # Returning resulting CI
-    ninty_five_CI_lower[i] <- as.numeric(quantile(sample_values, 0.025)) + background  #Need to add background prevalence of 0.00071 to every output
-    ninty_five_CI_upper[i] <- as.numeric(quantile(sample_values, 0.975)) + background
-  }
-  MIXDER$CI_lower = ninty_five_CI_lower
-  MIXDER$CI_upper = ninty_five_CI_upper
-  MIXDER$simpleeffect = IDER(d, ions = ions, model = model, parameters = Data_parameter) + background #SCW: I believe we should add background prevalence to every IDER
-  names = colnames(MIXDER)
-  for (k in ions){
-    ider = IDER(d, ions = k, model = model, parameters = Data_parameter)
-    MIXDER <- cbind(MIXDER, data.frame(ider))
-  }
-  colnames(MIXDER) <- c(names, ions)
-  return(list(MIXDER, bad_j))
 }
 
 

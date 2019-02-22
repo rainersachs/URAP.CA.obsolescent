@@ -260,7 +260,7 @@ IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, r = NULL, parameters = Dat
   info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
   output = 0
   for (i in 1: nrow(info_table)){
-    output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = model)
+    output = output + IDER(d*r, L = info_table$L[i], Z.b = info_table$Z.b[i], model = model, parameters = parameters)
   }
   return(output)
   stop("Model Not Recognized")
