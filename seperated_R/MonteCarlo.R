@@ -43,15 +43,21 @@ make_datapara <- function(l, model, n = MM){
 #Sample parameters from their distributions with covariances for 4para
 monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value), sigma = sig_4para)
 monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "kap"] > 1e-6, ] #Dropping negative kappas
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ]
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
 
-negative_kap_4para_cov = MM - nrow(monte_carlo_parameters) #The number of kap < 0
+negative_4para_cov = MM - nrow(monte_carlo_parameters) #The number of kap < 0
 
+
+############THIS
 while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
   new_row = rmvnorm(n = 1,mean = c(eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value), sigma = sig_4para)
-  if (as.numeric(new_row[, "kap"]) > 1e-6){
+  if (as.numeric(new_row[, "kap"]) > 1e-6 & as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "eta1"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6){
     monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
   }
 }
+
 eta0_MC = monte_carlo_parameters[, "eta0"]
 eta1_MC = monte_carlo_parameters[, "eta1"]
 sig0_MC = monte_carlo_parameters[, "sig0"]
@@ -81,7 +87,17 @@ monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_3para
 
 negative_sig0_3para_cov = sum(monte_carlo_parameters[,"sig0"] <= 1e-6) #The number of sig0 < 0
 
-monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
+#monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ] # Drops
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
+
+while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
+  new_row = rmvnorm(n = 1, mean = c(eta0 = filter(parameters_3para, parameter == "eta0")$value, eta1 = filter(parameters_3para, parameter == "eta1")$value, sig0 = filter(parameters_3para, parameter == "sig0")$value), sigma = sig_3para)
+  if (as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "eta1"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6) {
+    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
+  }
+}
 
 
 
@@ -105,8 +121,17 @@ para_3para_nocov = c(eta0 = list(eta0_MC_var),eta1 = list(eta1_MC_var), sig0 = l
 monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_2para, parameter == "eta0")$value ,sig0 = filter(parameters_2para, parameter == "sig0")$value), sigma = sig_2para)
 negative_sig0_2para_cov = sum(monte_carlo_parameters[, "sig0"] <= 1e-6) #The number of sig0 < 0
 
-monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
+#monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ] # Drops
+#monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
+monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
 
+while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
+  new_row = rmvnorm(n = 1, mean = c(eta0 = filter(parameters_2para, parameter == "eta0")$value ,sig0 = filter(parameters_2para, parameter == "sig0")$value), sigma = sig_2para)
+  if (as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6) {
+    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
+  }
+}
 
 eta0_MC = monte_carlo_parameters[, "eta0"]
 sig0_MC = monte_carlo_parameters[, "sig0"]

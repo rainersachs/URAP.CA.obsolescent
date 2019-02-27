@@ -2,51 +2,56 @@ source('Datatable.R')
 
 #Our IDERs (Individual Dose Effect Relations). Applicable to the 1-ion components of a mixed simulated GCR beam 
 #Modifying NTE1 and NTE2 by insisting they be twice continuously differentiable and monotonic increasing. Double check NTE1, NTE2, Our model
+dat <- modified_df
 
+old <- 0.00071
+new_bg <- 0.00385
 #4-para model
 func_4para = function(d, L, Z.b, eta0, eta1, sig0, kap0) {
   P = (1-exp(-Z.b/kap0))^2
   sig = sig0*P + 0.041/6.24*L*(1-P) # 0.041 +- 0.0051 comes from 16Cacao
   eta = eta0*L*exp(-eta1*L)
-  return(0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
+  return(new_bg + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
 } 
 
 #3-para model (##PW: obsolete)
 func_3para = function(d,L,eta0,eta1,sig0){
   eta = eta0*L*exp(-eta1*L)
-  return(0.00071 + 6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+  return(new_bg + 6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
 }
 
 
 #2-para model (##PW: obsolete)
 func_2para=function(d,L,eta0,sig0){
-  return(0.00071 + sig0*6.24*d/L*(1-exp(-1024*d/L)) + eta0*(1-exp(-10^5*d)))
+  return(new_bg + sig0*6.24*d/L*(1-exp(-1024*d/L)) + eta0*(1-exp(-10^5*d)))
 }
 
 #2-paraTE (##PW: Is this the "straw man TE-only 2 parameter model" Sachs referred to?)
 func_2paraTE = function(d,L,Z.b,kap0,sig0){
   P = (1 - exp(-Z.b/kap0))^2
   sigma = sig0*P + (0.041 * L/6.24)*(1-P)
-  return(0.00071 + (sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
+  return(new_bg + (sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
 }
-  
+
 modified_df = modified_df %>% filter(Z > 3)
+modified_df = modified_df %>% filter(d > 0)
+
 #Calibration for Parsimonious
 model_2para = nlsLM(CA ~func_2para(d,L,eta0,sig0) , data = modified_df, start = list(eta0 = 0.001, sig0 = 5), 
-                               weights = (1/(modified_df$error)^2))
+                    weights = (1/(modified_df$error)^2))
 ccoef = coef(model_2para)
 parameters_2para = data.frame(value = as.numeric(ccoef), model = "2para", parameter = names(ccoef))
 sig_2para= vcov(model_2para)
 #Calibration for 3-parameter model
 model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=modified_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
-                         weights = (1/(modified_df$error)^2))
+                    weights = (1/(modified_df$error)^2))
 ccoef = coef(model_3para)
 parameters_3para = data.frame(value = as.numeric(ccoef), model = "3para", parameter = names(ccoef))
 
 sig_3para = vcov(model_3para)
 #Calibration for 4-parameter model
 model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
-                   weights = (1/(modified_df$error)^2))
+                    weights = (1/(modified_df$error)^2))
 #Getting coefficients of the IDER model from nlsLM
 ccoef <- coef(model_4para)
 parameters_4para = data.frame(value = as.numeric(ccoef), model = "4para", parameter = names(ccoef))
@@ -55,7 +60,7 @@ sig_4para = vcov(model_4para)
 
 ##Calibration for 2-parameter TE Only Model
 model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = modified_df, start = list(sig0 = 5, kap0 = 500), 
-                   weights = (1/(modified_df$error)^2))
+                      weights = (1/(modified_df$error)^2))
 ccoef <- coef(model_2paraTE)
 parameters_2paraTE = data.frame(value = as.numeric(ccoef), model = "2paraTE", parameter = names(ccoef))
 
