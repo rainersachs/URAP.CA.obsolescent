@@ -20,6 +20,7 @@ non_convergence_4para_cov_full = MC_results_4para_cov_full[[2]] #This is a vecto
 # MC_results_3para_var = monte_carlo(ions = c("Fe600", "Si170", "O55", "O350"), para = MC_3para, n = 500, cov = F) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
 # MIXDER_3para_var = MC_results_3para_var[[1]] #This is the dataframe that will be passed into the graph
 # non_convergence_3para_var = MC_results_3para_var[[2]]
+
 #############################################################################################
 #Functions 
 

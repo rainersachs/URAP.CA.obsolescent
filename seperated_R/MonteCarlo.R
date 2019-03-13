@@ -1,11 +1,53 @@
 source('Synergy.R')
 
-#Confidence Intervals (Monte Carlo)
-set.seed(19970101)
-MM <- 500
+#In this section we are estimating the confidence intervals of the individual and mixture DERs using Monte Carlo
 
-#A function that makes monte_carlo parameters into MM dataframes
-make_datapara <- function(l, model, n = MM){
+set.seed(19970101)
+N <- 500
+
+#Monte-Carlo Parameters from Multivariate Normal Distributions
+###Note: We are conditioning on all parameters being positive (by dropping them negative ones and redraw the sample). 
+sample_parameters = function(model, n = N, cov = T){ #This function samples n sets of parameters from their joint distribution defined by the calibration process.
+  #Note: The calibrated parameter dataframes from Synergy.R file is required
+  if (model == "4para"){
+    calibrated = parameters_4para
+    covariance = sig_4para
+  }
+  else if (model == "3para"){
+    calibrated = parameters_3para
+    covariance = sig_3para
+  }
+  else if (model == "2para"){
+    calibrated = parameters_2para
+    covariance = sig_2para
+  }
+  if (!cov){ #If we are not using the covariance matrix, then the parameters will be independent
+    n_para = nrow(calibrated)
+    zeros = matrix(0, n_para, n_para)
+    variances = as.numeric(diag(covariance))
+    diag(zeros) = variances
+    covariance = zeros
+  }
+  mc_parameters = rmvnorm(n = n, mean = calibrated$value, sigma = covariance)
+  negatives = which(apply(mc_parameters, 1, function(row) any(row < 1e-6)))
+  n_negatives = length(negatives)
+  print(paste("There are ", n_negatives, " rows containing negative values out of ", n, " draws", sep = ""))
+  if(n_negatives > 0){
+    mc_parameters = mc_parameters[-negatives,]
+  }
+  while (nrow(mc_parameters) < n){ #Running a while loop to get enough draws from the multivariate Normal
+    new_row = rmvnorm(n = 1, mean = calibrated$value, sigma = covariance)
+    if (!any(new_row < 1e-6)){
+      mc_parameters = rbind(mc_parameters, new_row)
+    }
+  }
+  colnames(mc_parameters) = calibrated$parameter
+  return(mc_parameters)
+}
+
+#A function that makes monte_carlo parameters into N dataframes
+make_datapara <- function(l, model, n = N){
+  #l is a vector of lists, each list containing N sampled values
   name = model
   df_list = list()
   if (model == "4para"){
@@ -35,150 +77,15 @@ make_datapara <- function(l, model, n = MM){
   return(df_list)
 }
 
-####################################################
-#Monte-Carlo Parameters
-#In this section, we are conditioning on kappa > 0 (by dropping them negative ones and redraw the sample). 
-#Also, we are making sig0 > 0 (by replacing the negative values with a small positive number 1e-6)
-
-#Sample parameters from their distributions with covariances for 4para
-monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value), sigma = sig_4para)
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "kap"] > 1e-6, ] #Dropping negative kappas
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ]
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
-
-negative_4para_cov = MM - nrow(monte_carlo_parameters) #The number of kap < 0
-
-
-############THIS
-while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
-  new_row = rmvnorm(n = 1,mean = c(eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value), sigma = sig_4para)
-  if (as.numeric(new_row[, "kap"]) > 1e-6 & as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "eta1"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6){
-    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
-  }
-}
-
-eta0_MC = monte_carlo_parameters[, "eta0"]
-eta1_MC = monte_carlo_parameters[, "eta1"]
-sig0_MC = monte_carlo_parameters[, "sig0"]
-kap_MC = monte_carlo_parameters[, "kap"]
-
-
-#Sample parameters from their distributions without covariances
-eta0_MC_var = rnorm(MM, mean = filter(parameters_4para, parameter == "eta0")$value, sd = sqrt(sig_4para[1,1]))
-eta1_MC_var = rnorm(MM, mean = filter(parameters_4para, parameter == "eta1")$value, sd = sqrt(sig_4para[2,2]))
-sig0_MC_var = rnorm(MM, mean = filter(parameters_4para, parameter == "sig0")$value, sd = sqrt(sig_4para[3,3]))
-kap_MC_var = rnorm(MM, mean = filter(parameters_4para, parameter == "kap0")$value, sd = sqrt(sig_4para[4,4]))
-
-negative_kap_4para_var = MM - length(kap_MC_var) #The number of kap < 0
-
-while (length(kap_MC_var) < MM){  #Running a while loop to get enough draws from the normal 
-  new_value = rnorm(1, mean =filter(parameters_4para, parameter == "kap0")$value, sqrt(sig_4para[4,4]))
-  if (new_value > 1e-6){
-    kap_MC_var = c(kap_MC_var, new_value)
-  }
-}
-
-para_4para_cov =  c(eta0 = list(eta0_MC), eta1 = list(eta1_MC),sig0 = list(sig0_MC), kap0 = list(kap_MC))
-para_4para_nocov = c(eta0 = list(eta0_MC_var), eta1 = list(eta1_MC_var),sig0 = list(sig0_MC_var),kap0 =list(kap_MC_var))
-
-#Sample parameters from their distributions with covariances for Three parameter model.
-monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_3para, parameter == "eta0")$value, eta1 = filter(parameters_3para, parameter == "eta1")$value, sig0 = filter(parameters_3para, parameter == "sig0")$value), sigma = sig_3para)
-
-negative_sig0_3para_cov = sum(monte_carlo_parameters[,"sig0"] <= 1e-6) #The number of sig0 < 0
-
-#monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ] # Drops
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
-
-while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
-  new_row = rmvnorm(n = 1, mean = c(eta0 = filter(parameters_3para, parameter == "eta0")$value, eta1 = filter(parameters_3para, parameter == "eta1")$value, sig0 = filter(parameters_3para, parameter == "sig0")$value), sigma = sig_3para)
-  if (as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "eta1"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6) {
-    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
-  }
-}
-
-
-
-eta0_MC = monte_carlo_parameters[,"eta0"]
-eta1_MC = monte_carlo_parameters[,"eta1"]
-sig0_MC = monte_carlo_parameters[,"sig0"]
-
-#Sample parameters from their distributions without covariances for Three parameter model.
-eta0_MC_var = rnorm(MM, mean = filter(parameters_3para, parameter == "eta0")$value, sd = sqrt(sig_3para[1,1]))
-eta1_MC_var = rnorm(MM, mean = filter(parameters_3para, parameter == "eta1")$value, sd = sqrt(sig_3para[2,2]))
-sig0_MC_var = rnorm(MM, mean = filter(parameters_3para, parameter == "sig0")$value, sd = sqrt(sig_3para[3,3]))
-
-
-negative_sig0_3para_var = sum(sig0_MC_var <= 1e-6) #The number of sig0 < 0
-sig0_MC_var[sig0_MC_var <= 1e-6] = 1e-5
-
-para_3para_cov =  c(eta0 = list(eta0_MC),eta1 = list(eta1_MC), sig0 = list(sig0_MC))
-para_3para_nocov = c(eta0 = list(eta0_MC_var),eta1 = list(eta1_MC_var), sig0 = list(sig0_MC_var))
-
-#Sample parameters from their distributions with covariances for 2para
-monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = filter(parameters_2para, parameter == "eta0")$value ,sig0 = filter(parameters_2para, parameter == "sig0")$value), sigma = sig_2para)
-negative_sig0_2para_cov = sum(monte_carlo_parameters[, "sig0"] <= 1e-6) #The number of sig0 < 0
-
-#monte_carlo_parameters[monte_carlo_parameters[,"sig0"] <= 1e-6, ]["sig0"] = 1e-5
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta0"] > 1e-6, ] # Drops
-#monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "eta1"] > 1e-6, ]
-monte_carlo_parameters = monte_carlo_parameters[monte_carlo_parameters[, "sig0"] > 1e-6, ]
-
-while (nrow(monte_carlo_parameters) < MM){ #Running a while loop to get enough draws from the multivariate Normal
-  new_row = rmvnorm(n = 1, mean = c(eta0 = filter(parameters_2para, parameter == "eta0")$value ,sig0 = filter(parameters_2para, parameter == "sig0")$value), sigma = sig_2para)
-  if (as.numeric(new_row[, "eta0"]) > 1e-6 & as.numeric(new_row[, "sig0"]) > 1e-6) {
-    monte_carlo_parameters = rbind(monte_carlo_parameters, new_row)
-  }
-}
-
-eta0_MC = monte_carlo_parameters[, "eta0"]
-sig0_MC = monte_carlo_parameters[, "sig0"]
-
-
-#Sample parameters from their distributions without covariances for 2para
-
-eta0_MC_var = rnorm(MM, mean = filter(parameters_2para, parameter == "eta0")$value, sd = sqrt(sig_2para[1,1]))
-sig0_MC_var = rnorm(MM, mean = filter(parameters_2para, parameter == "sig0")$value, sd = sqrt(sig_2para[2,2]))
-
-negative_sig0_2para_var = sum(sig0_MC_var <= 1e-6) #The number of sig0 < 0
-sig0_MC_var[sig0_MC_var <= 1e-6] = 1e-5
-
-para_2para_cov =  c(eta0 = list(eta0_MC),sig0 = list(sig0_MC))
-para_2para_nocov= c(eta0 = list(eta0_MC_var),sig0 = list(sig0_MC_var))
-
-# #Sample parameters from their distributions with covariances for 2para TE only
-# monte_carlo_parameters = rmvnorm(n = MM, mean = c(eta0 = Data_parameter[9,1], sig0 = Data_parameter[10,1], sigma = sig_2paraTE))
-# sig0_MC = monte_carlo_parameters[, 1]
-# kap0_MC = monte_carlo_parameters[, 2]
-# #Sample parameters from their distributions without covariances for 2para TE only
-# sig0_MC_var = rnorm(MM, mean = Data_parameter[9,1], sd = sqrt(sig_2paraTE[1,1]))
-# kap0_MC_var = rnorm(MM, mean = Data_parameter[10,1], sd = sqrt(sig_2paraTE[2,2]))
-# para_2paraTE_nocov =  c(list(sig0_MC),list(kap0_MC))
-# para_2paraTE_cov= c(list(sig0_MC_var),list(kap0_MC_var))
-
-#Monte Carlo
-MC_2para_cov = make_datapara(para_2para_cov, model = "2para",n = MM)
-MC_2para_var = make_datapara(para_2para_nocov, model = "2para",n = MM)
-MC_3para_cov = make_datapara(para_3para_cov, model = "3para",n = MM)
-MC_3para_var = make_datapara(para_3para_nocov, model = "3para",n = MM)
-MC_4para_cov = make_datapara(para_4para_cov, model = "4para", n = MM)
-MC_4para_var = make_datapara(para_4para_nocov, model = "4para", n = MM)
-
-MC_2para = list(MC_2para_cov, MC_2para_var, name = "2para")
-MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
-MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
-###############################################
-
-monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = MM, background = 0, cov = T, model = NULL, IDER = F){
+#The main function that calculates the errors for each of the N = 500 sets of parameters.
+monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4para, d = c(seq(0, 0.009, 0.001), seq(0.01, 0.5, by = 0.01)), n = N, background = 0, cov = T, model = NULL, IDER = F){
   ##SCW: This is a generic function that takes names of the ions in the desired mixture as input and either plots out the ribbon graph or outputs the dataset
   #r is a vector that sums up to 1
   #ions is a vector of strings of the names of the ions in the mixture
   #d is a vector of different dosage
   #para is a list (MC_2para, MC_3para, or MC_4para), and it will tell the function which model to use
   #If cov = F plots out the result without using the cov matrix
-  #the maximum number for n is MM (in this case MM = 500)
+  #the maximum number for n is N (in this case N = 500)
   #If IDER = T then this outputs ribbons for IDER instead of MIXDER
   if (is.null(model)){
     model = para$name
@@ -250,7 +157,7 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
         DERs[j,] = der
       }
       cat(paste("  Currently at Monte Carlo step:", toString(j), "of", 
-                  toString(n)), sprintf('\r'))
+                toString(n)), sprintf('\r'))
     }
     if (length(bad_j) > 0){
       print(paste("Non-Convergence at i = ", bad_j))
@@ -273,5 +180,59 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
     return(list(MIXDER, bad_j))
   }
 }
+
+
+#################################################### Begin Sampling
+
+
+#4-Parameter Model Monte Carlo Sampling
+MC_4para_cov_samples = sample_parameters(model = "4para", n = N, cov = T)
+para_4para_cov =  c(eta0 = list(MC_4para_cov_samples[,"eta0"]), 
+                    eta1 = list(MC_4para_cov_samples[,"eta1"]),
+                    sig0 = list(MC_4para_cov_samples[,"sig0"]), 
+                    kap0 = list(MC_4para_cov_samples[,"kap0"]))
+MC_4para_var_samples = sample_parameters(model = "4para", n = N, cov = F)
+para_4para_var =  c(eta0 = list(MC_4para_var_samples[,"eta0"]), 
+                    eta1 = list(MC_4para_var_samples[,"eta1"]),
+                    sig0 = list(MC_4para_var_samples[,"sig0"]), 
+                    kap0 = list(MC_4para_var_samples[,"kap0"]))
+MC_4para_cov = make_datapara(para_4para_cov, model = "4para", n = N)
+MC_4para_var = make_datapara(para_4para_var, model = "4para", n = N)
+
+#3-Parameter Model Monte Carlo Sampling
+
+MC_3para_cov_samples = sample_parameters(model = "3para", n = N, cov = T)
+para_3para_cov =  c(eta0 = list(MC_3para_cov_samples[,"eta0"]), 
+                    eta1 = list(MC_3para_cov_samples[,"eta1"]),
+                    sig0 = list(MC_3para_cov_samples[,"sig0"]))
+
+MC_3para_var_samples = sample_parameters(model = "3para", n = N, cov = F)
+para_3para_var =  c(eta0 = list(MC_3para_var_samples[,"eta0"]), 
+                    eta1 = list(MC_3para_var_samples[,"eta1"]),
+                    sig0 = list(MC_3para_var_samples[,"sig0"]))
+
+MC_3para_cov = make_datapara(para_3para_cov, model = "3para",n = N)
+MC_3para_var = make_datapara(para_3para_var, model = "3para",n = N)
+
+#2-Parameter Model Monte Carlo Sampling
+
+MC_2para_cov_samples = sample_parameters(model = "2para", n = N, cov = T)
+para_2para_cov =  c(eta0 = list(MC_2para_cov_samples[,"eta0"]), 
+                    sig0 = list(MC_2para_cov_samples[,"sig0"]))
+
+MC_2para_var_samples = sample_parameters(model = "2para", n = N, cov = F)
+para_2para_var =  c(eta0 = list(MC_2para_var_samples[,"eta0"]), 
+                    sig0 = list(MC_2para_var_samples[,"sig0"]))
+
+MC_2para_cov = make_datapara(para_2para_cov, model = "2para",n = N)
+MC_2para_var = make_datapara(para_2para_var, model = "2para",n = N)
+
+#Combining them into lists for monte_carlo function
+MC_2para = list(MC_2para_cov, MC_2para_var, name = "2para")
+MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
+MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
+
+###############################################
+
 
 
