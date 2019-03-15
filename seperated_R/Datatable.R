@@ -10,4 +10,4 @@ rm(list=ls())
 # Some GCR components are high-speed Oxygen nuclei that are almost fully ionized. d=dose; CA are per hundred cells.
 #putting it in one big data frame. #rks: the data frame incorporates a correction to Fe600 at dose 0.06, near line 34
 
-modified_df = read.csv(file = 'HZE2.csv')
+modified_df = read.csv(file = 'CSV.csv')

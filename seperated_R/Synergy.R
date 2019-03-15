@@ -2,6 +2,7 @@ source('Datatable.R')
 
 #Our IDERs (Individual Dose Effect Relations). Applicable to the 1-ion components of a mixed simulated GCR beam 
 #Modifying NTE1 and NTE2 by insisting they be twice continuously differentiable and monotonic increasing. Double check NTE1, NTE2, Our model
+library("forecast")
 dat <- modified_df
 
 old <- 0.00071
@@ -33,6 +34,18 @@ func_2paraTE = function(d,L,Z.b,kap0,sig0){
   return(new_bg + (sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
 }
 
+#Swift Light Ion 2 parameter (less parsimonious) 
+func_sli_exp2 <- function(a, C, d) {
+  return(new_bg + C*(exp(a*d)-1))
+}
+
+#Swift Light Ion 3 paramter (less parsimonious)
+func_sli_exp3 <- function(a, b, C, d) {
+  return(new_bg + C*(exp(a*d+b*d^2)-1))
+}
+
+
+swift_light_df <- filter(modified_df, Z <= 2 & d>0)
 modified_df = modified_df %>% filter(Z > 3)
 modified_df = modified_df %>% filter(d > 0)
 
@@ -66,13 +79,28 @@ parameters_2paraTE = data.frame(value = as.numeric(ccoef), model = "2paraTE", pa
 
 sig_2paraTE = vcov(model_2paraTE)
 
+swift_light_df <- swift_light_df %>% mutate(dd = d^2)
+
+#Calibration for SLI Linear 1 parameter
+model_sli_linear1 <- lm(I(CA - new_bg) ~ 0 + d, data = swift_light_df)
+ccoef <- coef(model_sli_linear1)
+parameters_sli_lin1 <- data.frame(value = as.numeric(ccoef), model = "sli_lin1", parameter = names(ccoef))
+sig_lin1 <- vcov(model_sli_linear1)
+
+#Calibration for SLI Linear 2 parameter
+model_sli_linear2 <- lm(I(CA - new_bg) ~ 0 + d + I(d^2), data = swift_light_df)
+ccoef <- coef(model_sli_linear2)
+parameters_sli_lin2 <- data.frame(value = as.numeric(ccoef), model = "sli_lin2", parameter = names(ccoef))
+sig_lin2 <- vcov(model_sli_linear2)
+
+
 
 #Combining the calibrated parameters into one dataframe.
 # Data_parameter = data.frame(value=c(eta0_parsimonious,sigm0_parsimonious,eta0_Threepara,sigm0_Threepara,eta1_Threepara,eta0_IDER,
 #                                     eta1_IDER,sigm0_IDER,kap_IDER,sig0_TEonly,kap0_TEonly),model=c('2para','2para','3para','3para','3para','4para','4para','4para','4para','2paraTE','2paraTE'),
 #                             parameter = c('eta0','sig0','eta0','sig0','eta1','eta0','eta1','sig0','kap0','sig0','kap0'))
 #The code above is commented out because the values are typed in pretty much manually. Imrpoved the code to make it not sensible to number of parameters.
-Data_parameter = rbind(parameters_2para, parameters_3para, parameters_4para, parameters_2paraTE)
+Data_parameter = rbind(parameters_2para, parameters_3para, parameters_4para, parameters_2paraTE, parameters_sli_lin1, parameters_sli_lin2)
 
 #Useful output
 Data_parameter
@@ -80,6 +108,8 @@ sig_2para
 sig_3para
 sig_4para
 sig_2paraTE
+sig_lin1
+sig_lin2
 
 
 ########################################
@@ -208,6 +238,21 @@ LOO_2paraTE_df = LOO("2paraTE",modified_df,func_2paraTE)
 LOO_2paraTE = (1/nrow(modified_df))*sum((LOO_2paraTE_df$CA_value - LOO_2paraTE_df$CA_predict)^2)
 LOO_CV_df = data.frame(CV_value = c(LOO_2para,LOO_3para,LOO_4para,LOO_2paraTE), row.names = c("2para model", "3para model", "4para model", "2paraTE model"))
 LOO_CV_df
+
+
+#Leave On Out Cross Validation for linear
+LOOCV_linear <- function(model) {
+  h = lm.influence(model)$h
+  return(mean((residuals(model)/(1-h))^2))
+}
+#Above function is not actually needed, we can use CV function from forecast package to get LOOCV, AIC and BIC
+LOO_sli_linear1 <- CV(model_sli_linear1)[[1]]
+AIC_sli_linear1 <- CV(model_sli_linear1)[[2]]
+BIC_sli_linear1 <- CV(model_sli_linear1)[[4]]
+
+LOO_sli_linear2 <- CV(model_sli_linear2)[[1]]
+AIC_sli_linear2 <- CV(model_sli_linear2)[[2]]
+BIC_sli_linear2 <- CV(model_sli_linear2)[[4]]
 ########################################
 
 IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, r = NULL, parameters = Data_parameter, model = "4para") {
@@ -251,6 +296,7 @@ IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, r = NULL, parameters = Dat
       sigma = sig0*P + (0.00041 * L/6.242)*(1-P)
       return((sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
     }
+    
     # if (model == "lowLET"){
     #   return(0.00001+ alpha * d)
     # }
