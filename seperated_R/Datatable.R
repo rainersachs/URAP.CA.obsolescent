@@ -11,3 +11,11 @@ rm(list=ls())
 #putting it in one big data frame. #rks: the data frame incorporates a correction to Fe600 at dose 0.06, near line 34
 
 modified_df = read.csv(file = 'CSV.csv')
+# Calculate the background
+
+dose0 = modified_df[modified_df$d == 0.0000,]
+num = sum(dose0$tumor)
+risk = sum(dose0$At.Risk)
+p = num/risk
+BG_CA = p*2.478
+BG_error = (sqrt((p*(1-p))/(risk)))*2.478
