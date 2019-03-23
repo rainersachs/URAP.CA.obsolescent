@@ -1,0 +1,18 @@
+Comments:
+
+There are some LET discrepancies. We decided to use the values given by Hada in all cases
+For now, we changed the LET measurements for two rows: Row28 from 17 to 20.93, Row91 from 190 to 175
+For now, we changed the Z.b value for row42 from 504.9148 to 504.918
+
+###################################################################################################################
+
+Column Descriptions:
+
+KE: Specific kinetic energy (SKE in MeV/u)
+CA: WGE apparently simple aberrations
+X.T: Total apparently simple (AS) abberrations observed with 3-color painting
+X: Exchanges
+X.1: Incomplete Exchanges
+X.2: Dicentrics
+X.3: Incomplete Dicentrics
+nn: Number of nucleons (protons + neutrons) in the atomic nucleus

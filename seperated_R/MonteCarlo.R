@@ -131,7 +131,7 @@ monte_carlo <- function(ions, r = rep(1/length(ions), length(ions)), para = MC_4
   }
   
   else{ #This section is for MIXDER ribbon
-    info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
+    info_table = main_df %>% group_by(ion, L, Z.b) %>% summarise() %>% filter(ion %in% ions)
     info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
     L = info_table$L
     Z.b = info_table$Z.b

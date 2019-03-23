@@ -3,68 +3,65 @@ source('Datatable.R')
 #Our IDERs (Individual Dose Effect Relations). Applicable to the 1-ion components of a mixed simulated GCR beam 
 #Modifying NTE1 and NTE2 by insisting they be twice continuously differentiable and monotonic increasing. Double check NTE1, NTE2, Our model
 library("forecast")
-dat <- modified_df
 
-old <- 0.00071
-new_bg <- 0.00385
 #4-para model
 func_4para = function(d, L, Z.b, eta0, eta1, sig0, kap0) {
   P = (1-exp(-Z.b/kap0))^2
   sig = sig0*P + 0.041/6.24*L*(1-P) # 0.041 +- 0.0051 comes from 16Cacao
   eta = eta0*L*exp(-eta1*L)
-  return(new_bg + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
+  return(BG_CA + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))  #0.00071 + sig*6.24*d/L*(1-exp(-1024*d/L)) + eta*(1-exp(-10^3*d))#don't use
 } 
 
 #3-para model (##PW: obsolete)
 func_3para = function(d,L,eta0,eta1,sig0){
   eta = eta0*L*exp(-eta1*L)
-  return(new_bg + 6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
+  return(BG_CA + 6.24*sig0*d/L*(1 - exp(-1024*d/L)) + eta*(1-exp(-10^5*d)))
 }
 
 
 #2-para model (##PW: obsolete)
 func_2para=function(d,L,eta0,sig0){
-  return(new_bg + sig0*6.24*d/L*(1-exp(-1024*d/L)) + eta0*(1-exp(-10^5*d)))
+  return(BG_CA + sig0*6.24*d/L*(1-exp(-1024*d/L)) + eta0*(1-exp(-10^5*d)))
 }
 
 #2-paraTE (##PW: Is this the "straw man TE-only 2 parameter model" Sachs referred to?)
 func_2paraTE = function(d,L,Z.b,kap0,sig0){
   P = (1 - exp(-Z.b/kap0))^2
   sigma = sig0*P + (0.041 * L/6.24)*(1-P)
-  return(new_bg + (sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
+  return(BG_CA + (sigma*6.24*(d/L))*(1 - exp(-1024*(d/L))))
 }
 
 #Swift Light Ion 2 parameter (less parsimonious) 
 func_sli_exp2 <- function(a, C, d) {
-  return(new_bg + C*(exp(a*d)-1))
+  return(BG_CA + C*(exp(a*d)-1))
 }
 
 #Swift Light Ion 3 paramter (less parsimonious)
 func_sli_exp3 <- function(a, b, C, d) {
-  return(new_bg + C*(exp(a*d+b*d^2)-1))
+  return(BG_CA + C*(exp(a*d+b*d^2)-1))
 }
 
 
-swift_light_df <- filter(modified_df, Z <= 2 & d>0)
-modified_df = modified_df %>% filter(Z > 3)
-modified_df = modified_df %>% filter(d > 0)
+swift_light_df <- filter(main_df, Z <= 2 & d>0)
+main_df = main_df %>% filter(Z > 3)
+main_df = main_df %>% filter(d > 0)
 
 #Calibration for Parsimonious
-model_2para = nlsLM(CA ~func_2para(d,L,eta0,sig0) , data = modified_df, start = list(eta0 = 0.001, sig0 = 5), 
-                    weights = (1/(modified_df$error)^2))
+model_2para = nlsLM(CA ~func_2para(d,L,eta0,sig0) , data = main_df, start = list(eta0 = 0.001, sig0 = 5), 
+                    weights = (1/(main_df$error)^2))
 ccoef = coef(model_2para)
 parameters_2para = data.frame(value = as.numeric(ccoef), model = "2para", parameter = names(ccoef))
 sig_2para= vcov(model_2para)
 #Calibration for 3-parameter model
-model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=modified_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
-                    weights = (1/(modified_df$error)^2))
+model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=main_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
+                    weights = (1/(main_df$error)^2))
 ccoef = coef(model_3para)
 parameters_3para = data.frame(value = as.numeric(ccoef), model = "3para", parameter = names(ccoef))
 
 sig_3para = vcov(model_3para)
 #Calibration for 4-parameter model
-model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
-                    weights = (1/(modified_df$error)^2))
+model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = main_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
+                    weights = (1/(main_df$error)^2))
 #Getting coefficients of the IDER model from nlsLM
 ccoef <- coef(model_4para)
 parameters_4para = data.frame(value = as.numeric(ccoef), model = "4para", parameter = names(ccoef))
@@ -72,8 +69,8 @@ parameters_4para = data.frame(value = as.numeric(ccoef), model = "4para", parame
 sig_4para = vcov(model_4para)
 
 ##Calibration for 2-parameter TE Only Model
-model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = modified_df, start = list(sig0 = 5, kap0 = 500), 
-                      weights = (1/(modified_df$error)^2))
+model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = main_df, start = list(sig0 = 5, kap0 = 500), 
+                      weights = (1/(main_df$error)^2))
 ccoef <- coef(model_2paraTE)
 parameters_2paraTE = data.frame(value = as.numeric(ccoef), model = "2paraTE", parameter = names(ccoef))
 
@@ -82,13 +79,13 @@ sig_2paraTE = vcov(model_2paraTE)
 swift_light_df <- swift_light_df %>% mutate(dd = d^2)
 
 #Calibration for SLI Linear 1 parameter
-model_sli_linear1 <- lm(I(CA - new_bg) ~ 0 + d, data = swift_light_df)
+model_sli_linear1 <- lm(I(CA - BG_CA) ~ 0 + d, data = swift_light_df)
 ccoef <- coef(model_sli_linear1)
 parameters_sli_lin1 <- data.frame(value = as.numeric(ccoef), model = "sli_lin1", parameter = names(ccoef))
 sig_lin1 <- vcov(model_sli_linear1)
 
 #Calibration for SLI Linear 2 parameter
-model_sli_linear2 <- lm(I(CA - new_bg) ~ 0 + d + I(d^2), data = swift_light_df)
+model_sli_linear2 <- lm(I(CA - BG_CA) ~ 0 + d + I(d^2), data = swift_light_df)
 ccoef <- coef(model_sli_linear2)
 parameters_sli_lin2 <- data.frame(value = as.numeric(ccoef), model = "sli_lin2", parameter = names(ccoef))
 sig_lin2 <- vcov(model_sli_linear2)
@@ -118,23 +115,23 @@ L_function = function(func, eta0=0, eta1=0, sig0=0, kap=0,model){
   #A function trhat returns the residual squared
   if (model == "4para"){
     a = vector(length = 0)
-    for (i in 1:length(modified_df[, 1])) {
-      a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i], Z.b = modified_df$Z.b[i], eta0 = eta0, eta1 = eta1, sig0 = sig0, kap = kap))}
+    for (i in 1:length(main_df[, 1])) {
+      a = c(a, main_df$CA[i] - func(d = main_df$d[i], L = main_df$L[i], Z.b = main_df$Z.b[i], eta0 = eta0, eta1 = eta1, sig0 = sig0, kap = kap))}
   }
   if (model =="3para"){
     a = vector(length = 0)
-    for (i in 1:length(modified_df[, 1])) {
-      a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i], eta0 = eta0, eta1 = eta1, sig0 = sig0))}
+    for (i in 1:length(main_df[, 1])) {
+      a = c(a, main_df$CA[i] - func(d = main_df$d[i], L = main_df$L[i], eta0 = eta0, eta1 = eta1, sig0 = sig0))}
   }
   if(model == "2para"){
     a = vector(length = 0)
-    for (i in 1:length(modified_df[, 1])) {
-      a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i],eta0 = eta0,sig0 = sig0))}
+    for (i in 1:length(main_df[, 1])) {
+      a = c(a, main_df$CA[i] - func(d = main_df$d[i], L = main_df$L[i],eta0 = eta0,sig0 = sig0))}
   }
   if(model =="2paraTE"){
     a = vector(length = 0)
-    for (i in 1:length(modified_df[, 1])) {
-      a = c(a, modified_df$CA[i] - func(d = modified_df$d[i], L = modified_df$L[i], Z.b = modified_df$Z.b[i], sig0 = sig0, kap = kap))}
+    for (i in 1:length(main_df[, 1])) {
+      a = c(a, main_df$CA[i] - func(d = main_df$d[i], L = main_df$L[i], Z.b = main_df$Z.b[i], sig0 = sig0, kap = kap))}
   }
   return(a^2)
 }
@@ -144,17 +141,17 @@ L_3para = L_function(func_3para, eta0 = filter(parameters_3para, parameter == "e
 L_4para  = L_function(func_4para, eta0 = filter(parameters_4para, parameter == "eta0")$value, eta1 = filter(parameters_4para, parameter == "eta1")$value, sig0 = filter(parameters_4para, parameter == "sig0")$value, kap = filter(parameters_4para, parameter == "kap0")$value,model = "4para")
 L_2paraTE = L_function(func_2paraTE,sig0 = filter(parameters_2paraTE, parameter == "sig0")$value, kap = filter(parameters_2paraTE, parameter == "kap0")$value,model = "2paraTE")
 
-WRSS_2para = sum((1/modified_df$error^2)*L_2para)
-WRSS_3para = sum((1/modified_df$error^2)*L_3para)
-WRSS_4para = sum((1/modified_df$error^2)*L_4para)
-WRSS_2paraTE = sum((1/modified_df$error^2)*L_2paraTE)
+WRSS_2para = sum((1/main_df$error^2)*L_2para)
+WRSS_3para = sum((1/main_df$error^2)*L_3para)
+WRSS_4para = sum((1/main_df$error^2)*L_4para)
+WRSS_2paraTE = sum((1/main_df$error^2)*L_2paraTE)
 
 #functions for AIC and BIC calculation for Weighted Least Square regression (using WRSS calculated above)
-AIC_function = function(RSS, k, n = nrow(modified_df)) {
+AIC_function = function(RSS, k, n = nrow(main_df)) {
   n + n*log(2*pi) + n*log(RSS/n) + 2*(k+1)
 }
 
-BIC_function = function(n = nrow(modified_df), k, RSS) {
+BIC_function = function(n = nrow(main_df), k, RSS) {
   n + n*log(2*pi) + n*log(RSS/n) + log(n)*(k+1)
 }
 
@@ -170,14 +167,14 @@ information_critera_df = data.frame(AIC = c(AIC_2para,AIC_3para,AIC_4para,AIC_2p
 information_critera_df #IDER has the lowest score (performs better) in both criteria.
 
 #Leave-one-out cross validation
-LOO = function(model,modified_df,func){
-  value <- data.frame(matrix(nrow=nrow(modified_df), ncol=2)) 
+LOO = function(model,main_df,func){
+  value <- data.frame(matrix(nrow=nrow(main_df), ncol=2)) 
   x <- c("CA_value", "CA_predict")
   colnames(value) <- x
   if (model == "2para"){
-    for (i in 1:nrow(modified_df)){
-      train = modified_df[-i,]
-      test = modified_df[i,]
+    for (i in 1:nrow(main_df)){
+      train = main_df[-i,]
+      test = main_df[i,]
       model_2para = nlsLM(CA ~func(d,L,eta0,sig0) , data = train, start = list(eta0 = 0.001, sig0 = 5), 
                           weights = (1/(train$error)^2))
       ccoef = coef(model_2para)
@@ -187,11 +184,11 @@ LOO = function(model,modified_df,func){
       value$CA_predict[i] = func(test$d,test$L,eta0_2para,sigm0_2para)}
   }
   if (model == "3para"){
-    for (i in 1:nrow(modified_df)){
-      train = modified_df[-i,]
-      test = modified_df[i,]
-      model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=modified_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
-                          weights = (1/(modified_df$error)^2))
+    for (i in 1:nrow(main_df)){
+      train = main_df[-i,]
+      test = main_df[i,]
+      model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=main_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
+                          weights = (1/(main_df$error)^2))
       ccoef = coef(model_3para)
       eta0_Threepara = as.numeric(ccoef[1])
       sigm0_Threepara = as.numeric(ccoef[3])
@@ -200,11 +197,11 @@ LOO = function(model,modified_df,func){
       value$CA_predict[i] = func(test$d,test$L,eta0_Threepara,sigm0_Threepara,eta1_Threepara)}
   }
   if (model == "4para"){
-    for (i in 1:nrow(modified_df)){
-      train = modified_df[-i,]
-      test = modified_df[i,]
-      model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = modified_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
-                          weights = (1/(modified_df$error)^2))
+    for (i in 1:nrow(main_df)){
+      train = main_df[-i,]
+      test = main_df[i,]
+      model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = main_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
+                          weights = (1/(main_df$error)^2))
       coefs <- coef(model_4para)
       eta0_IDER <- as.numeric(coefs[1])
       eta1_IDER <- as.numeric(coefs[2])
@@ -214,11 +211,11 @@ LOO = function(model,modified_df,func){
       value$CA_predict[i] = func(test$d,test$L,test$Z.b,eta0_IDER,eta1_IDER,sigm0_IDER,kap_IDER)}
   }
   if (model == "2paraTE"){
-    for (i in 1:nrow(modified_df)){
-      train = modified_df[-i,]
-      test = modified_df[i,]
-      model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = modified_df, start = list(sig0 = 5, kap0 = 500), 
-                            weights = (1/(modified_df$error)^2))
+    for (i in 1:nrow(main_df)){
+      train = main_df[-i,]
+      test = main_df[i,]
+      model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = main_df, start = list(sig0 = 5, kap0 = 500), 
+                            weights = (1/(main_df$error)^2))
       coefs <- coef(model_2paraTE)
       sig0_TEonly <- as.numeric(coefs[1])
       kap0_TEonly <- as.numeric(coefs[2])
@@ -228,14 +225,14 @@ LOO = function(model,modified_df,func){
   return(value)
 }
 
-LOO_2para_df = LOO("2para",modified_df,func_2para)
-LOO_2para = (1/nrow(modified_df))*sum((LOO_2para_df$CA_value - LOO_2para_df$CA_predict)^2)
-LOO_3para_df = LOO("3para",modified_df,func_3para)
-LOO_3para = (1/nrow(modified_df))*sum((LOO_3para_df$CA_value - LOO_3para_df$CA_predict)^2)
-LOO_4para_df = LOO("4para",modified_df,func_4para)
-LOO_4para = (1/nrow(modified_df))*sum((LOO_4para_df$CA_value - LOO_4para_df$CA_predict)^2)
-LOO_2paraTE_df = LOO("2paraTE",modified_df,func_2paraTE)
-LOO_2paraTE = (1/nrow(modified_df))*sum((LOO_2paraTE_df$CA_value - LOO_2paraTE_df$CA_predict)^2)
+LOO_2para_df = LOO("2para",main_df,func_2para)
+LOO_2para = (1/nrow(main_df))*sum((LOO_2para_df$CA_value - LOO_2para_df$CA_predict)^2)
+LOO_3para_df = LOO("3para",main_df,func_3para)
+LOO_3para = (1/nrow(main_df))*sum((LOO_3para_df$CA_value - LOO_3para_df$CA_predict)^2)
+LOO_4para_df = LOO("4para",main_df,func_4para)
+LOO_4para = (1/nrow(main_df))*sum((LOO_4para_df$CA_value - LOO_4para_df$CA_predict)^2)
+LOO_2paraTE_df = LOO("2paraTE",main_df,func_2paraTE)
+LOO_2paraTE = (1/nrow(main_df))*sum((LOO_2paraTE_df$CA_value - LOO_2paraTE_df$CA_predict)^2)
 LOO_CV_df = data.frame(CV_value = c(LOO_2para,LOO_3para,LOO_4para,LOO_2paraTE), row.names = c("2para model", "3para model", "4para model", "2paraTE model"))
 LOO_CV_df
 
@@ -307,7 +304,7 @@ IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, r = NULL, parameters = Dat
   if (is.null(r)){#Default r is average
     r = 1/length(ions)
   }
-  info_table = modified_df %>% group_by(ion, L, Z.b) %>% summarise()
+  info_table = main_df %>% group_by(ion, L, Z.b) %>% summarise()
   info_table = suppressWarnings(left_join(data.frame(ions), info_table, by = c("ions" = "ion")))
   output = 0
   for (i in 1: nrow(info_table)){
