@@ -79,17 +79,31 @@ sig_2paraTE = vcov(model_2paraTE)
 swift_light_df <- swift_light_df %>% mutate(dd = d^2)
 
 #Calibration for SLI Linear 1 parameter
-model_sli_linear1 <- lm(I(CA - BG_CA) ~ 0 + d, data = swift_light_df)
+model_sli_linear1 <- lm(I(CA - BG_CA) ~ 0 + d, data = swift_light_df, weights = (1/(swift_light_df$error)^2))
 ccoef <- coef(model_sli_linear1)
 parameters_sli_lin1 <- data.frame(value = as.numeric(ccoef), model = "sli_lin1", parameter = names(ccoef))
 sig_lin1 <- vcov(model_sli_linear1)
 
 #Calibration for SLI Linear 2 parameter
-model_sli_linear2 <- lm(I(CA - BG_CA) ~ 0 + d + I(d^2), data = swift_light_df)
+model_sli_linear2 <- lm(I(CA - BG_CA) ~ 0 + d + I(d^2), data = swift_light_df, weights = (1/(swift_light_df$error)^2))
 ccoef <- coef(model_sli_linear2)
 parameters_sli_lin2 <- data.frame(value = as.numeric(ccoef), model = "sli_lin2", parameter = names(ccoef))
 sig_lin2 <- vcov(model_sli_linear2)
 
+#lets take out values below bg
+edit_sli <- filter(swift_light_df, CA >= BG_CA)
+#calibration exponential
+model_sli_exp2 <- nlsLM(CA ~ func_sli_exp2(a, C, d), data = swift_light_df, start = list(a = -0.01, C = -1), weights = (1/(swift_light_df$error)^2))
+ccoef <- coef(model_sli_exp2)
+parameters_sli_exp2 <- data.frame(value = as.numeric(ccoef), model = "sli_exp2", parameter = names(ccoef))
+sig_exp2 <- vcov(model_sli_exp2)
+
+
+model_sli_exp3 <-  nlsLM(CA ~ func_sli_exp3(a,b, C, d), data = swift_light_df, start = list(a = -0.5, C = -1, b = -10), weights = (1/(swift_light_df$error)^2))
+ccoef <- coef(model_sli_exp3)
+parameters_sli_exp3 <- data.frame(value = as.numeric(ccoef), model = "sli_exp3", parameter = names(ccoef))
+sig_exp3 <- vcov(model_sli_exp3)
+#ggplot(swift_light_df) + geom_point(aes(x = d, y = CA)) + geom_line(aes(x = d, y = predict(model_sli_exp2)), col = "blue") + geom_line(aes(x = d, y = predict(model_sli_exp3)), col = "red")
 
 
 #Combining the calibrated parameters into one dataframe.
@@ -97,7 +111,14 @@ sig_lin2 <- vcov(model_sli_linear2)
 #                                     eta1_IDER,sigm0_IDER,kap_IDER,sig0_TEonly,kap0_TEonly),model=c('2para','2para','3para','3para','3para','4para','4para','4para','4para','2paraTE','2paraTE'),
 #                             parameter = c('eta0','sig0','eta0','sig0','eta1','eta0','eta1','sig0','kap0','sig0','kap0'))
 #The code above is commented out because the values are typed in pretty much manually. Imrpoved the code to make it not sensible to number of parameters.
-Data_parameter = rbind(parameters_2para, parameters_3para, parameters_4para, parameters_2paraTE, parameters_sli_lin1, parameters_sli_lin2)
+Data_parameter = rbind(parameters_2para, 
+                       parameters_3para, 
+                       parameters_4para, 
+                       parameters_2paraTE, 
+                       parameters_sli_lin1, 
+                       parameters_sli_lin2, 
+                       parameters_sli_exp2, 
+                       parameters_sli_exp3)
 
 #Useful output
 Data_parameter
@@ -250,6 +271,11 @@ BIC_sli_linear1 <- CV(model_sli_linear1)[[4]]
 LOO_sli_linear2 <- CV(model_sli_linear2)[[1]]
 AIC_sli_linear2 <- CV(model_sli_linear2)[[2]]
 BIC_sli_linear2 <- CV(model_sli_linear2)[[4]]
+SLI_AICs = c(AIC_sli_linear1, AIC_sli_linear2)
+SLI_BICs = c(BIC_sli_linear1, BIC_sli_linear2)
+SLI_LOOs = c(LOO_sli_linear1, LOO_sli_linear2)
+SLI_summary = data.frame(model = c("Linear", "Quadratic"), AIC = SLI_AICs, BIC = SLI_BICs, LOO = SLI_LOOs)
+SLI_summary
 ########################################
 
 IDER = function(d, L = NULL, Z.b = NULL, ions = NULL, r = NULL, parameters = Data_parameter, model = "4para") {
