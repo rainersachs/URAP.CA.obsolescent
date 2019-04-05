@@ -3,7 +3,7 @@ library(ggplot2)
 library(tidyr)
 theme_update(plot.title = element_text(hjust = 0.5), plot.subtitle = element_text(hjust = 0.5)) #This centers plot titles for ggplots
 
-MC_results_4para_cov_full = monte_carlo(ions = c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260", "O55", "O350"), para = MC_4para, n = 500) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
+MC_results_4para_cov_full = monte_carlo(ions = c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260", "O77", "O350"), para = MC_4para, n = 500) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
 MIXDER_4para_cov_full = MC_results_4para_cov_full[[1]] #This is the dataframe that will be passed into the graph
 
 
@@ -63,7 +63,7 @@ ggsave("Intro_Squeezed.png", width = 10, height = 7)
 ###################################################################################################################################################################
 
 ##Dose Effect Relationship Plots
-DER_df = main_df %>% filter(ion %in% c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260","O55", "O350"))
+DER_df = main_df %>% filter(ion %in% c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260","O77", "O350"))
 DER_df$CA = DER_df$CA - BG_CA #Taking out background
 DER_df = filter(DER_df, (d > 0) & (d <= 0.5)) #Taking out 0 dosage points and cut at 0.5
 MIXDER = MIXDER_4para_cov_full
@@ -107,25 +107,43 @@ p_Si170 = IDER_plot(ion = "Si170")
 p_Si170
 ggsave("Si170IDER.png", width = 10, height = 7)
 
+p_Si260 = IDER_plot(ion = "Si260")
+p_Si260
+ggsave("Si260IDER.png", width = 10, height = 7)
+
 p_Fe600 = IDER_plot(ion = "Fe600")
 p_Fe600
 ggsave("Fe600IDER.png", width = 10, height = 7)
+
+p_Fe450 = IDER_plot(ion = "Fe450")
+p_Fe450
+ggsave("Fe450IDER.png", width = 10, height = 7)
 
 p_Fe300 = IDER_plot(ion = "Fe300")
 p_Fe300
 ggsave("Fe300IDER.png", width = 10, height = 7)
 
+p_O77 = IDER_plot(ion = "O77")
+p_O77
+ggsave("O77IDER.png", width = 10, height = 7)
+p_O350 = IDER_plot(ion = "O350")
+p_O350
+ggsave("O350IDER.png", width = 10, height = 7)
 
+library(gridExtra)
+grid.arrange(p_Fe600, p_Fe450, p_Fe300, nrow = 2)
+
+grid.arrange(p_Si170, p_Si260, nrow = 1)
 
 ##MIXDER Plot, using the same ions.
 names(MIXDER)[2] <- "mixDER"
-p_mix = ggplot(data = MIXDER, aes(x = d * 100)) + #This example consists a mixture of 4 ions: "Fe600", "Si170", "O55", "O350". 
+p_mix = ggplot(data = MIXDER, aes(x = d * 100)) + #This example consists a mixture of 4 ions: "Fe600", "Si170", "O77", "O350". 
   geom_line(aes(y = 100 * Fe300, color = "Fe300"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * Fe450, color = "Fe450"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * Fe600, color = "Fe600"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * Ti300, color = "Ti300"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * O350, color = "O350"), linetype = "dashed", size = 1) +
-  geom_line(aes(y = 100 * O55, color = "O55"), linetype = "dashed", size = 1) +
+  geom_line(aes(y = 100 * O77, color = "O77"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * Si170, color = "Si170"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100 * Si170, color = "Si260"), linetype = "dashed", size = 1) +
   geom_line(aes(y = 100*mixDER, color = "MIXDER"), linetype = "solid", size = 1.2) + #MIXDER (black solid line)
@@ -135,7 +153,7 @@ p_mix = ggplot(data = MIXDER, aes(x = d * 100)) + #This example consists a mixtu
   scale_alpha_continuous(range = c(0.3, 1)) +
   scale_size_continuous("Accuracy",range = c(1.5,4)) +
   
-  scale_color_manual("Ions", breaks = c("MIXDER", "Fe300", "Fe450","Fe600",  "Ti300", "Si170", "Si260", "O55", "O350"), values=c("cyan2",  "cornflowerblue", "blue3", "black", "purple", "red", "orange","tan4", "darkgreen")) + #legend for Ions
+  scale_color_manual("Ions", breaks = c("MIXDER", "Fe300", "Fe450","Fe600",  "Ti300", "Si170", "Si260", "O77", "O350"), values=c("cyan2",  "cornflowerblue", "blue3", "black", "purple", "red", "orange","tan4", "darkgreen")) + #legend for Ions
   guides(alpha=FALSE) +
   theme(panel.background = element_rect(fill = "white", colour = "grey50"),  #Some random tweeks of the ggplot theme. Need someone more artistic to do this part :)
         panel.grid.major.y = element_line(colour = "grey80"),
