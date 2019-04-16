@@ -19,10 +19,11 @@ IDER_graph(subset(main_df, d >= 0.05 & CA > 0.01 & Z == 22 & grepl("2018", Comme
 
 ##Model Free Plot in Intro
 p_intro_all = ggplot(main_df %>% filter(d <= 0.5), aes(x = 100*d, y = 100*CA)) + 
-  geom_point(aes(col = ion)) +
+  geom_point(aes(col = ion,size = 1/sqrt(error))) +
   geom_smooth(method = "lm", se = F) +
   geom_segment(aes(x = 0, y = 0, xend = 0, yend = 100*BG_CA), size = 2, color = "red") +
   geom_errorbar(aes(x = 0, ymin = 0, ymax = 100*(BG_CA + BG_error)), width = 0.5, color = "red") +
+  
   theme(panel.background = element_rect(fill = "white", colour = "grey50"),  #Some random tweeks of the ggplot theme. Need someone more artistic to do this part :)
         panel.grid.major.y = element_line(colour = "grey80"),
         panel.grid.minor.y = element_line(linetype = "dashed", colour = "grey80"),
@@ -31,16 +32,18 @@ p_intro_all = ggplot(main_df %>% filter(d <= 0.5), aes(x = 100*d, y = 100*CA)) +
         plot.title = element_text(size = 20, face = "bold"), 
         axis.title = element_text(size = 15, face = "bold"),
         legend.title = element_text(size = 12, face = "bold")) +
+  
+  scale_size_continuous("Accuracy",range = c(1.7, 4)) +
   labs(x = "100*Dosage", y = "100*Chromosomal Aberrations", title = "Visual Evidence for NTE", subtitle = "Raw Data")  #axis labels and plot title
 p_intro_all
 
-ggsave("Intro_Scatter.png", width = 10, height = 7)
+#ggsave("Intro_Scatter.eps",device = "eps", width = 10, height = 7)
 
 squeezed_df = main_df %>% filter(d <= 0.5) %>% group_by(d) %>% summarise(p = sum(X.T)/sum(At.Risk), CA = p * 2.478, error = (sqrt((p*(1-p))/(sum(At.Risk))))*2.478) 
 p_intro_squeezed = ggplot(squeezed_df, aes(x = 100*d, y = 100*CA)) + 
-  geom_point() +
+  geom_point(size = 3) +
   geom_smooth(method = "lm", se = F) +
-  geom_errorbar(aes(ymin = 100*(CA - error), ymax = 100*(CA + error)), width = 0.5) + #Errorbars for each point from original data
+  geom_errorbar(aes(ymin = 100*(CA - error), ymax = 100*(CA + error)), width = 1) + #Errorbars for each point from original data
   geom_errorbar(aes(x = 0, ymin = 0, ymax = 100*(BG_CA + BG_error)), width = 1) +
   geom_segment(aes(x = 0, y = 0, xend = 0, yend = 100*BG_CA, color = "Value = 0.38"), size = 2.5) +
   
@@ -58,7 +61,7 @@ p_intro_squeezed = ggplot(squeezed_df, aes(x = 100*d, y = 100*CA)) +
   labs(x = "100*Dosage", y = "100*Chromosomal Aberrations", title = "Visual Evidence for NTE", subtitle = "Raw Data Grouped by Dosage") #axis labels and plot title
 
 p_intro_squeezed
-ggsave("Intro_Squeezed.png", width = 10, height = 7)
+#ggsave("Intro_Squeezed.eps",device = "eps", width = 10, height = 7)
 
 ###################################################################################################################################################################
 
