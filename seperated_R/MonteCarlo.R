@@ -21,6 +21,10 @@ sample_parameters = function(model, n = N, cov = T){ #This function samples n se
     calibrated = parameters_2para
     covariance = sig_2para
   }
+  else if (model == "2paraTE"){
+    calibrated = parameters_2paraTE
+    covariance = sig_2paraTE
+  }
   if (!cov){ #If we are not using the covariance matrix, then the parameters will be independent
     n_para = nrow(calibrated)
     zeros = matrix(0, n_para, n_para)
@@ -70,6 +74,14 @@ make_datapara <- function(l, model, n = N){
     paras = c("eta0", "sig0")
     for (i in 1:n){
       value = c((l$eta0)[i], (l$sig0)[i])
+      df = data.frame(value, model = name, parameter = paras)
+      df_list[[i]] = df
+    }
+  }
+  else if (model == "2paraTE"){
+    paras = c("sig0", "kap0")
+    for (i in 1:n){
+      value = c((l$sig0)[i], (l$kap0)[i])
       df = data.frame(value, model = name, parameter = paras)
       df_list[[i]] = df
     }
@@ -227,11 +239,26 @@ para_2para_var =  c(eta0 = list(MC_2para_var_samples[,"eta0"]),
 MC_2para_cov = make_datapara(para_2para_cov, model = "2para",n = N)
 MC_2para_var = make_datapara(para_2para_var, model = "2para",n = N)
 
+#2-Parameter Model Monte Carlo Sampling
+
+MC_2paraTE_cov_samples = sample_parameters(model = "2paraTE", n = N, cov = T)
+para_2paraTE_cov =  c(sig0 = list(MC_2paraTE_cov_samples[,"sig0"]), 
+                    kap0 = list(MC_2paraTE_cov_samples[,"kap0"]))
+
+MC_2paraTE_var_samples = sample_parameters(model = "2paraTE", n = N, cov = F)
+para_2paraTE_var =  c(sig0 = list(MC_2paraTE_var_samples[,"sig0"]), 
+                      kap0 = list(MC_2paraTE_var_samples[,"kap0"]))
+
+MC_2paraTE_cov = make_datapara(para_2paraTE_cov, model = "2paraTE",n = N)
+MC_2paraTE_var = make_datapara(para_2paraTE_var, model = "2paraTE",n = N)
+
+
+
 #Combining them into lists for monte_carlo function
 MC_2para = list(MC_2para_cov, MC_2para_var, name = "2para")
 MC_3para = list(MC_3para_cov, MC_3para_var, name = "3para")
 MC_4para = list(MC_4para_cov, MC_4para_var, name = "4para")
-
+MC_2paraTE =  list(MC_2paraTE_cov, MC_2paraTE_var, name = "2paraTE")
 ###############################################
 
 

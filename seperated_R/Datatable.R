@@ -75,5 +75,5 @@ dose0 = main_df[main_df$d == 0.0000,]
 num = sum(dose0$X.T)
 risk = sum(dose0$At.Risk)
 p = num/risk
-BG_CA = p*2.478
-BG_error = (sqrt((p*(1-p))/(risk)))*2.478
+BG_CA = p
+BG_error = (sqrt((p*(1-p))/(risk)))

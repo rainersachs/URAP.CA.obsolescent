@@ -6,6 +6,8 @@ theme_update(plot.title = element_text(hjust = 0.5), plot.subtitle = element_tex
 MC_results_4para_cov_full = monte_carlo(ions = c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260", "O77", "O350"), para = MC_4para, n = 500) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
 MIXDER_4para_cov_full = MC_results_4para_cov_full[[1]] #This is the dataframe that will be passed into the graph
 
+MC_results_2paraTE_cov_full = monte_carlo(ions = c("Fe300", "Fe450","Fe600", "Ti300", "Si170", "Si260", "O77", "O350"), para = MC_2paraTE, n = 500) #This outputs a list of MIXDER dataframe and a vector of the indexes at which there were convergence issues. 
+MIXDER_2paraTE_cov_full = MC_results_2paraTE_cov_full[[1]] #This is the dataframe that will be passed into the graph
 
 ##################################################################
 #Selecting Specific Data by Using Function subset().
@@ -45,9 +47,9 @@ p_intro_squeezed = ggplot(squeezed_df, aes(x = 100*d, y = 100*CA)) +
   geom_smooth(method = "lm", se = F) +
   geom_errorbar(aes(ymin = 100*(CA - error), ymax = 100*(CA + error)), width = 1) + #Errorbars for each point from original data
   geom_errorbar(aes(x = 0, ymin = 0, ymax = 100*(BG_CA + BG_error)), width = 1) +
-  geom_segment(aes(x = 0, y = 0, xend = 0, yend = 100*BG_CA, color = "Value = 0.38"), size = 2.5) +
+  geom_segment(aes(x = 0, y = 0, xend = 0, yend = 100*BG_CA, color = paste("Value =", round(100*BG_CA,2))), size = 2.5) +
   
-  scale_color_manual("Background", breaks = "Value = 0.38", values= "red2") + #legend for Ions
+  scale_color_manual("Background", breaks = paste("Value =", round(100*BG_CA,2)), values= "red2") + #legend for Ions
   theme(panel.background = element_rect(fill = "white", colour = "grey50"),  #Some random tweeks of the ggplot theme. Need someone more artistic to do this part :)
       panel.grid.major.y = element_line(colour = "grey80"),
       panel.grid.minor.y = element_line(linetype = "dashed", colour = "grey80"),
@@ -61,7 +63,7 @@ p_intro_squeezed = ggplot(squeezed_df, aes(x = 100*d, y = 100*CA)) +
   labs(x = "100*Dosage", y = "100*Chromosomal Aberrations", title = "Visual Evidence for NTE", subtitle = "Raw Data Grouped by Dosage") #axis labels and plot title
 
 p_intro_squeezed
-#ggsave("Intro_Squeezed.eps",device = "eps", width = 10, height = 7)
+ggsave("Intro_Squeezed.eps",device = "eps", width = 10, height = 7)
 
 ###################################################################################################################################################################
 
@@ -207,8 +209,20 @@ ggplot(DER_SLI_df, aes(x = 100*d)) +
 ggsave("SLILinearDER.png", width = 10, height = 7)
 
 
+ggplot(main_df, aes(x = d, y = CA)) +
+  geom_point(aes(color = ion))
 
+ggplot(main_df %>% filter(ion == "Fe600") %>% filter(d <= 0.4) %>% filter(MeH_. != "P-24"), 
+       aes(x = d, y = CA)) + 
+  geom_point(aes(color = MeH_., size = 1/sqrt(error))) + 
+  scale_size_continuous("Accuracy",range = c(1.7, 3)) + 
+  geom_smooth(method = "lm", se = F, aes(color = MeH_.))
 
+ggplot(main_df %>% filter(ion == "O77") %>% filter(d <= 0.1), 
+       aes(x = d, y = CA)) + 
+  geom_point(aes(color = MeH_., size = 1/sqrt(error))) + 
+  scale_size_continuous("Accuracy",range = c(1.7, 3)) + 
+  geom_smooth(method = "lm", se = F, aes(color = MeH_.))
 #############################################################################################
 # Old Plot
 # d = MIXDER$d

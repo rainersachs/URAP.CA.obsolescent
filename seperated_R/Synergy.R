@@ -184,8 +184,8 @@ AIC_4para = AIC_function(k=4, RSS = WRSS_4para)
 BIC_4para = BIC_function(k=4, RSS = WRSS_4para)
 AIC_2paraTE = AIC_function(k=2, RSS = WRSS_2paraTE)
 BIC_2paraTE = BIC_function(k=2, RSS = WRSS_2paraTE)
-information_critera_df = data.frame(AIC = c(AIC_2para,AIC_3para,AIC_4para,AIC_2paraTE), BIC= c(BIC_2para,BIC_3para,BIC_4para,BIC_2paraTE), row.names = c("2para model", "3para model", "4para model", "2paraTE model"))
-information_critera_df #IDER has the lowest score (performs better) in both criteria.
+information_criteria_df = data.frame(AIC = c(AIC_2para,AIC_3para,AIC_4para,AIC_2paraTE), BIC= c(BIC_2para,BIC_3para,BIC_4para,BIC_2paraTE), row.names = c("2para model", "3para model", "4para model", "2paraTE model"))
+information_criteria_df #IDER has the lowest score (performs better) in both criteria.
 
 #Leave-one-out cross validation
 LOO = function(model,main_df,func){
@@ -208,21 +208,21 @@ LOO = function(model,main_df,func){
     for (i in 1:nrow(main_df)){
       train = main_df[-i,]
       test = main_df[i,]
-      model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=main_df,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
-                          weights = (1/(main_df$error)^2))
+      model_3para = nlsLM(CA~func_3para(d,L,eta0,eta1,sig0), data=train,start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5),
+                          weights = (1/(train$error)^2))
       ccoef = coef(model_3para)
       eta0_Threepara = as.numeric(ccoef[1])
       sigm0_Threepara = as.numeric(ccoef[3])
       eta1_Threepara = as.numeric(ccoef[2])
       value$CA_value[i] = test$CA
-      value$CA_predict[i] = func(test$d,test$L,eta0_Threepara,sigm0_Threepara,eta1_Threepara)}
+      value$CA_predict[i] = func(test$d,test$L,eta0_Threepara,eta1_Threepara, sigm0_Threepara)}
   }
   if (model == "4para"){
     for (i in 1:nrow(main_df)){
       train = main_df[-i,]
       test = main_df[i,]
-      model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = main_df, start = list(eta0 = 0.001, eta1 = 0.01, sig0 = 5, kap0 = 500), 
-                          weights = (1/(main_df$error)^2))
+      model_4para = nlsLM(CA ~ func_4para(d, L, Z.b, eta0, eta1, sig0, kap0), data = train, start = list(eta0 = 0.0001, eta1 = 0.001, sig0 = 5, kap0 = 500), 
+                          weights = (1/(train$error)^2))
       coefs <- coef(model_4para)
       eta0_IDER <- as.numeric(coefs[1])
       eta1_IDER <- as.numeric(coefs[2])
@@ -235,13 +235,13 @@ LOO = function(model,main_df,func){
     for (i in 1:nrow(main_df)){
       train = main_df[-i,]
       test = main_df[i,]
-      model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = main_df, start = list(sig0 = 5, kap0 = 500), 
-                            weights = (1/(main_df$error)^2))
+      model_2paraTE = nlsLM(CA ~ func_2paraTE(d,L,Z.b,kap0,sig0), data = train, start = list(sig0 = 5, kap0 = 500), 
+                            weights = (1/(train$error)^2))
       coefs <- coef(model_2paraTE)
       sig0_TEonly <- as.numeric(coefs[1])
       kap0_TEonly <- as.numeric(coefs[2])
       value$CA_value[i] = test$CA
-      value$CA_predict[i] = func(test$d,test$L,test$Z.b,sig0_TEonly,kap0_TEonly)}
+      value$CA_predict[i] = func(test$d,test$L,test$Z.b,kap0_TEonly, sig0_TEonly)}
   }
   return(value)
 }
@@ -430,7 +430,7 @@ MIXDER_function = function(r, L, Z.b, d = seq(0, 0.2, by = 0.001), parameters = 
         }
         dI = vector(length = length(L))
         for (i in 1:length(L)) {
-          dI[i] = r[i]*(sig[i]*6.24/L[i]*(1 - exp(-1024*u[i]/L[i]) + 1024*u[i]/L[i]*(exp(-1024*u[i]/L[i]))) + etaa[i]*10^5*exp(-10^5*u[i]))
+          dI[i] = r[i]*(sig[i]*6.24/L[i]*(1 - exp(-1024*u[i]/L[i]) + 1024/L[i]*(exp(-1024*u[i]/L[i]))))
         }
         dI = sum(dI)
         return(list(c(dI)))
